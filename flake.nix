@@ -1,11 +1,11 @@
 {
-  description = "graft: other repositories as git submodules pinned to release tags, wired into your flake";
+  description = "tuteur: hold a repository to other repositories' patterns, pinned as git submodules at release tags and wired into its flake";
 
-  # graft is other flakes' input (github:, and path: or tarballs in its tests), so this flake.nix must not
+  # tuteur is other flakes' input (github:, and path: or tarballs in its tests), so this flake.nix must not
   # declare inputs.self.submodules: Nix applies it to that fetch too, and those schemes reject it
-  # ("input attribute 'submodules' not supported by scheme 'github'"). # graft: no self.submodules
-  # So graft can't mkFlake itself: its scion is absent from its source. The docs check is in dev/flake.nix
-  # (nix flake check ./dev), with its knowledge-base-kit input, so graft's consumers never lock it.
+  # ("input attribute 'submodules' not supported by scheme 'github'"). # tuteur: no self.submodules
+  # So tuteur can't mkFlake itself: its pattern (knowledge-base-kit) is absent from its source. The docs check is in dev/flake.nix
+  # (nix flake check ./dev), with its knowledge-base-kit input, so tuteur's consumers never lock it.
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
 
   outputs = { self, nixpkgs, ... }@inputs:
@@ -14,23 +14,23 @@
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
       forAll = f: lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
 
-      # graft's command is built from graft's own sources alone: lib/'s scripts, its jq files and the
-      # scions README it writes, and template/. lib/mk-flake.nix is not in it, so a change to mkFlake
+      # tuteur's command is built from tuteur's own sources alone: lib/'s scripts, its jq files and the
+      # patterns README it writes, and template/. lib/mk-flake.nix is not in it, so a change to mkFlake
       # leaves packages.<system>.default as it was (tests/run.sh `own` checks it).
-      graftLib = builtins.path { path = ./lib; name = "graft-lib";
-        filter = p: t: t == "regular" && (lib.hasSuffix ".sh" p || lib.hasSuffix ".jq" p || baseNameOf p == "scions-readme.md"); };
-      # The graft command (lib/graft.sh), with this version's workflows (template/). ENV is exported
-      # first: a repo's own app (mkFlake) sets GRAFT_IN_REPO and GRAFT_DIR, its scions directory's name;
-      # graft's own package sets nothing, and reads any checkout with -C.
+      tuteurLib = builtins.path { path = ./lib; name = "tuteur-lib";
+        filter = p: t: t == "regular" && (lib.hasSuffix ".sh" p || lib.hasSuffix ".jq" p || baseNameOf p == "patterns-readme.md"); };
+      # The tuteur command (lib/tuteur.sh), with this version's workflows (template/). ENV is exported
+      # first: a repo's own app (mkFlake) sets TUTEUR_IN_REPO and TUTEUR_DIR, its patterns folder's name;
+      # tuteur's own package sets nothing, and reads any checkout with -C.
       cli = pkgs: env: pkgs.writeShellApplication {
-        name = "graft";
+        name = "tuteur";
         runtimeInputs = with pkgs; [ bash coreutils diffutils findutils gawk gnugrep gnused jq git util-linux curl openssh ];
         text = ''
           ${lib.concatStrings (lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}\n") env)}
-          export GRAFT_TEMPLATE=${./template}
-          exec bash ${graftLib}/graft.sh "$@"
+          export TUTEUR_TEMPLATE=${./template}
+          exec bash ${tuteurLib}/tuteur.sh "$@"
         '';
-        meta.description = "Graft other repositories as git submodules pinned to release tags";
+        meta.description = "Hold a repository to other repositories' patterns, pinned as git submodules at release tags";
       };
       mkFlake = import ./lib/mk-flake.nix { inherit nixpkgs systems cli; };
       # an output that went to pot's flake (github:danielnaab/pot) with graft v2's split: an error naming where
@@ -48,37 +48,37 @@
       homeManagerModules.pot = moved "homeManagerModules.pot" "pot.homeManagerModules.pot";
 
       # Run against any checkout without evaluating its flake:
-      #   nix run github:danielnaab/graft -- outdated -C path/to/repo
-      # tools: empty (graft grafts only docs conventions); `graft check` from the repo's app evaluates it
+      #   nix run github:danielnaab/tuteur -- outdated -C path/to/repo
+      # tools: empty (tuteur's own pattern is docs conventions); `tuteur check` from the repo's app evaluates it
       packages = forAll (pkgs: {
         default = cli pkgs { };
         tools = pkgs.buildEnv { name = "tools"; paths = [ ]; };
       });
 
-      # graft's own app, as mkFlake gives a consumer one: nix run .#graft check, sync, ci …
+      # tuteur's own app, as mkFlake gives a consumer one: nix run .#tuteur check, sync, ci …
       apps = forAll (pkgs: {
-        graft = { type = "app"; program = lib.getExe (cli pkgs { GRAFT_DIR = "scions"; GRAFT_IN_REPO = "1"; }); meta.description = "graft, for this repository"; };
+        tuteur = { type = "app"; program = lib.getExe (cli pkgs { TUTEUR_DIR = ".patterns"; TUTEUR_IN_REPO = "1"; }); meta.description = "tuteur, for this repository"; };
       });
 
       devShells = forAll (pkgs: { default = pkgs.mkShell { packages = [ (cli pkgs { }) pkgs.shellcheck pkgs.jq ]; }; });
 
-      # A new repo's flake.nix and graft's workflows: nix flake init -t github:danielnaab/graft
+      # A new repo's flake.nix and tuteur's workflows: nix flake init -t github:danielnaab/tuteur
       templates.default = {
         path = ./template;
-        description = "A repo that grafts other repositories, with graft's Forgejo workflows";
+        description = "A repository held to other repositories' patterns, with tuteur's Forgejo workflows";
         welcomeText = ''
-          Graft a first repository (a git submodule at its newest release tag), then commit:
-            nix run github:danielnaab/graft/v2.22.0 -- add -C . URL
-          See https://github.com/danielnaab/graft.
+          Add a first pattern (a git submodule at its newest release tag), then commit:
+            nix run github:danielnaab/tuteur/v0.1.0 -- add -C . URL
+          See https://github.com/danielnaab/tuteur.
         '';
       };
 
       checks = forAll (pkgs: {
         # bash -n first: bash's own parser, so a script bash can't run fails even where shellcheck's
         # parser would differ
-        shellcheck = pkgs.runCommand "graft-shellcheck" { nativeBuildInputs = [ pkgs.shellcheck ]; } ''
-          for f in ${./tests}/*.sh ${graftLib}/*.sh; do bash -n "$f" || exit 1; done
-          shellcheck -x ${./tests/run.sh} ${./tests/fixtures.sh} ${graftLib}/*.sh
+        shellcheck = pkgs.runCommand "tuteur-shellcheck" { nativeBuildInputs = [ pkgs.shellcheck ]; } ''
+          for f in ${./tests}/*.sh ${tuteurLib}/*.sh; do bash -n "$f" || exit 1; done
+          shellcheck -x ${./tests/run.sh} ${./tests/fixtures.sh} ${tuteurLib}/*.sh
           touch $out
         '';
       });

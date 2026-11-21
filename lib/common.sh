@@ -1,47 +1,55 @@
 #!/usr/bin/env bash
-# common.sh: functions graft's commands share. Sourced, never run; defines only (and one temporary
-# directory, GRAFT_TMP, removed on exit: scripts that source this put their temporary files there
+# common.sh: functions tuteur's commands share. Sourced, never run; defines only (and one temporary
+# directory, TUTEUR_TMP, removed on exit: scripts that source this put their temporary files there
 # and set no EXIT trap of their own).
 #
-#   locate                  the repo's top, its scions directory and the flake beside it
-#   scions_registered       the scions .gitmodules registers there: name, path, url
+#   locate                  the repo's top, its patterns folder and the flake beside it
+#   patterns_registered       the patterns .gitmodules registers there: name, path, url
 #   gitlink, tags_of, version_at
-#                           a scion's pin, its upstream's release tags, and the tag a commit is
-#   lock_node, is_semver    a flake.lock's root inputs (graft's own pin), read as data
+#                           a pattern's pin, its upstream's release tags, and the tag a commit is
+#   lock_node, is_semver    a flake.lock's root inputs (tuteur's own pin), read as data
 #   full_check              the repo's whole `nix flake check`, each check by name
-#   upstream_input          what changed upstream for graft's pin between two locks
+#   upstream_input          what changed upstream for tuteur's pin between two locks
 #   upstream_range          what changed upstream between two commits or tags (CHANGELOG sections
 #                           or commits), fetched with plain git and returned as JSON
 #   changelog_between, cap  the text helpers under them
 
-# graft's markers: the scions README's first line (lib/scions-readme.md; also mkFlake's), and the
-# first line of each of graft's workflows (lib/workflows.sh holds its own copy: graft upgrade runs
+# tuteur's markers: the patterns README's first line (lib/patterns-readme.md; also mkFlake's), and the
+# first line of each of tuteur's workflows (lib/workflows.sh holds its own copy: tuteur upgrade runs
 # another version's).
-MARKER="<!-- managed by graft: https://github.com/danielnaab/graft -->"
+MARKER="<!-- managed by tuteur: https://github.com/danielnaab/tuteur -->"
 # shellcheck disable=SC2034 # used by the scripts that source this file
-WORKFLOW_MARKER='# managed by graft: '
+WORKFLOW_MARKER='# managed by tuteur: '
+# graft's markers (graft v2, before the rename), read through 0.1.x: sync rewrites them (tuteur check names them)
+OLD_MARKER="<!-- managed by graft: https://github.com/danielnaab/graft -->"
 nix_() { nix --extra-experimental-features 'nix-command flakes' "$@"; }
-# nix_clean ARGS: nix_ through an empty fetch cache of this run's own (XDG_CACHE_HOME in GRAFT_TMP), and without the
-# global flake registry (which an empty cache would download again; graft names every input in full). A pin it
+# nix_clean ARGS: nix_ through an empty fetch cache of this run's own (XDG_CACHE_HOME in TUTEUR_TMP), and without the
+# global flake registry (which an empty cache would download again; tuteur names every input in full). A pin it
 # locks is the tag's own tree: never one that another fetch of that commit left in the person's cache (a git+file:
 # or . fetch keeps the files a provider export-ignores, and a github: input of the commit then locks their hash,
 # which a machine without that cache, CI, refuses: NAR hash mismatch).
 nix_clean() {
-  mkdir -p "$GRAFT_TMP/nix-cache"
-  XDG_CACHE_HOME=$GRAFT_TMP/nix-cache nix_ --option flake-registry '' "$@"
+  mkdir -p "$TUTEUR_TMP/nix-cache"
+  XDG_CACHE_HOME=$TUTEUR_TMP/nix-cache nix_ --option flake-registry '' "$@"
 }
 # git whose output parses the same whatever the user's config: no colour, no grep column
 git() { command git -c color.ui=never -c grep.column=false "$@"; }
-# graft's lib/, for jq's -L: upstream.jq's helpers (clean: upstream text as plain lines)
-GRAFT_LIB=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-GRAFT_TMP=$(mktemp -d)
-trap 'rm -rf "$GRAFT_TMP"' EXIT
+# tuteur's lib/, for jq's -L: upstream.jq's helpers (clean: upstream text as plain lines)
+TUTEUR_LIB=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+TUTEUR_TMP=$(mktemp -d)
+trap 'rm -rf "$TUTEUR_TMP"' EXIT
 
-die() { echo "graft: $*" >&2; exit 1; }
+die() { echo "tuteur: $*" >&2; exit 1; }
 
-# graft try's marker, at the repo's top: a file marked with intent to add, so that Nix reads the
+# alias_line THING WHAT: one line, never a failure, for a name of graft's that tuteur 0.1.x still reads
+alias_line() { echo "tuteur: $1 is graft's name; 0.2.0 drops it: $2" >&2; }
+
+# tuteur try's marker, at the repo's top: a file marked with intent to add, so that Nix reads the
 # working tree (a tracked file differs from HEAD)
-TRY=.graft-try
+TRY=.tuteur-try
+# graft's (graft v2): check fails on it too, through 0.1.x
+# shellcheck disable=SC2034 # used by the scripts that source this file
+OLD_TRY=.graft-try
 # try_state (from the top): "on" while the index holds the marker and HEAD doesn't; "committed" when
 # HEAD holds it and the index still does (a staged removal is off); "left" when it is only an
 # untracked file (after a reset): Nix doesn't read the working tree for it; nothing when try is off
@@ -53,24 +61,30 @@ try_state() {
   elif [ -e "$TRY" ]; then echo left; fi
 }
 
-# The copy-mode README graft v2.12 and earlier wrote: a table of copied scions
+# provider_file PATH: the provider file of the pattern at PATH: PATH/tuteur.nix, else PATH/graft.nix (graft v2's name,
+# read through 0.1.x); fails when it has neither
+provider_file() {
+  if [ -f "$1/tuteur.nix" ]; then echo "$1/tuteur.nix"; elif [ -f "$1/graft.nix" ]; then echo "$1/graft.nix"; else return 1; fi
+}
+
+# The copy-mode README graft v2.12 and earlier wrote: a table of copied patterns
 copy_mode_readme() { grep -qsF -e '| Scion | Commit |' -e '<!-- graft flake: ' "$1"; }
 COPY_MODE="is graft's copy-mode README (v2.12 or earlier): graft v2.13.0 pins scions with git submodules; follow the Upgrading steps of v2.13.0 in graft's CHANGELOG.md (https://github.com/danielnaab/graft/blob/v2/CHANGELOG.md)"
 
 # locate [REPO]: cd to the repo's top (REPO's, with -C, else the current directory's) and set:
-#   SCIONS      the scions directory, from the top: the one folder whose README.md carries graft's
-#               marker (git grep, which never looks inside a submodule, so a provider's own scions
+#   PATTERNS      the patterns folder, from the top: the one folder whose README.md carries tuteur's
+#               marker, or graft's (git grep, which never looks inside a submodule, so a provider's own patterns
 #               README is never ours), or "" when there is none yet
-#   SCIONS_NEW  where a first scion goes when there is none: GRAFT_DIR (mkFlake's dir, set by a
-#               repo's own app) beside the flake the app was run from, else `scions` at the top
-#   FLAKE       the flake's directory: the scions directory's parent (`.` at the top)
+#   PATTERNS_NEW  where a first pattern goes when there is none: TUTEUR_DIR (mkFlake's dir, set by a
+#               repo's own app) beside the flake the app was run from, else `.patterns` at the top
+#   FLAKE       the flake's directory: the patterns folder's parent (`.` at the top)
 #   FLAKE_REF   the reference that evaluates it: `.`, or `path:/abs/top/DIR` for a flake in a
 #               subdirectory, which copies only that directory to the store (absolute, since Nix
 #               won't write the lock of a relative path: flake; percent-encoded)
 #   FLAKE_NIX FLAKE_LOCK   its flake.nix and flake.lock, from the top
-#   GRAFT_RUN   how a person runs its app from the top: `nix run .#graft`, `nix run 'path:DIR#graft'`
+#   TUTEUR_RUN   how a person runs its app from the top: `nix run .#tuteur`, `nix run 'path:DIR#tuteur'`
 #               (quoted for zsh)
-# Fails on a copy-mode scions README (graft v2.12), and on two scions directories.
+# Fails on a copy-mode patterns README (graft v2.12), and on two patterns folders.
 # shellcheck disable=SC2034 # set for the scripts that source this
 locate() {
   local out rc=0 d prefix n
@@ -79,47 +93,47 @@ locate() {
   prefix=$(git rev-parse --show-prefix)
   TOP=$(git rev-parse --show-toplevel)
   cd "$TOP" || exit 1
-  out=$(git grep -l -F -e "$MARKER" -e '| Scion | Commit |' -- '*/README.md') || rc=$?
+  out=$(git grep -l -F -e "$MARKER" -e "$OLD_MARKER" -e '| Scion | Commit |' -- '*/README.md') || rc=$?
   [ "$rc" -le 1 ] || die "can't search $(pwd) with git (exit $rc; see above)"
-  SCIONS=""
+  PATTERNS=""
   n=0
   while IFS= read -r d; do
     [ -n "$d" ] || continue
     ! copy_mode_readme "$d" || die "$d $COPY_MODE"
-    grep -qsF -- "$MARKER" "$d" || continue
+    grep -qsF -e "$MARKER" -e "$OLD_MARKER" -- "$d" || continue
     n=$((n + 1))
-    if [ -n "$SCIONS" ]; then die "two scions directories: $SCIONS, ${d%/README.md}; graft supports one per repository"; fi
-    SCIONS=${d%/README.md}
+    if [ -n "$PATTERNS" ]; then die "two patterns folders: $PATTERNS, ${d%/README.md}; tuteur supports one per repository"; fi
+    PATTERNS=${d%/README.md}
   done <<<"$out"
-  if [ -n "$SCIONS" ]; then
-    if [[ $SCIONS == */* ]]; then FLAKE=${SCIONS%/*}; else FLAKE=.; fi
-    SCIONS_NEW=$SCIONS
+  if [ -n "$PATTERNS" ]; then
+    if [[ $PATTERNS == */* ]]; then FLAKE=${PATTERNS%/*}; else FLAKE=.; fi
+    PATTERNS_NEW=$PATTERNS
   else
     FLAKE=.
     prefix=${prefix%/}
-    if [ -n "${GRAFT_DIR:-}" ] && [ -n "$prefix" ] && [ -f "$prefix/flake.nix" ]; then FLAKE=$prefix; fi
-    if [ "$FLAKE" = . ]; then SCIONS_NEW=${GRAFT_DIR:-scions}; else SCIONS_NEW=$FLAKE/${GRAFT_DIR:-scions}; fi
+    if [ -n "${TUTEUR_DIR:-}" ] && [ -n "$prefix" ] && [ -f "$prefix/flake.nix" ]; then FLAKE=$prefix; fi
+    if [ "$FLAKE" = . ]; then PATTERNS_NEW=${TUTEUR_DIR:-.patterns}; else PATTERNS_NEW=$FLAKE/${TUTEUR_DIR:-.patterns}; fi
   fi
   flake_vars
 }
 
-# flake_vars: FLAKE_REF FLAKE_NIX FLAKE_LOCK GRAFT_RUN from FLAKE
+# flake_vars: FLAKE_REF FLAKE_NIX FLAKE_LOCK TUTEUR_RUN from FLAKE
 # shellcheck disable=SC2034 # set for the scripts that source this
 flake_vars() {
   if [ "$FLAKE" = . ]; then
-    FLAKE_REF=. FLAKE_NIX=flake.nix FLAKE_LOCK=flake.lock GRAFT_RUN="nix run .#graft"
+    FLAKE_REF=. FLAKE_NIX=flake.nix FLAKE_LOCK=flake.lock TUTEUR_RUN="nix run .#tuteur"
   else
     FLAKE_REF="path:$(jq -rn --arg p "$(pwd -P)/$FLAKE" '$p | split("/") | map(@uri) | join("/")')"
-    FLAKE_NIX=$FLAKE/flake.nix FLAKE_LOCK=$FLAKE/flake.lock GRAFT_RUN="nix run 'path:$FLAKE#graft'"
+    FLAKE_NIX=$FLAKE/flake.nix FLAKE_LOCK=$FLAKE/flake.lock TUTEUR_RUN="nix run 'path:$FLAKE#tuteur'"
   fi
 }
 
-# kits_just_wanted: whether this repository uses graft's generated kits.just (v2.18.0): the file is there, or
+# kits_just_wanted: whether this repository uses tuteur's generated kits.just (v2.18.0): the file is there, or
 # the repository's justfile imports it. Only then do sync, upgrade and check evaluate it.
 kits_just_wanted() {
-  [ -n "${SCIONS:-}" ] || return 1
-  [ -f "$SCIONS/kits.just" ] && return 0
-  [ -f justfile ] && grep -qF "$SCIONS/kits.just" justfile
+  [ -n "${PATTERNS:-}" ] || return 1
+  [ -f "$PATTERNS/kits.just" ] && return 0
+  [ -f justfile ] && grep -qF "$PATTERNS/kits.just" justfile
 }
 
 # kits_just_text: the kits.just the flake's pot-kits generates (pot-lib/1's passthru.kitsJust), by evaluation
@@ -138,31 +152,31 @@ has_pot_kits() {
   [ "$(nix_ eval --json "$FLAKE_REF#packages.$system" --apply 'p: p ? pot-kits' 2>/dev/null)" = true ]
 }
 
-# kits_just_write: graft sync's and upgrade's step: write SCIONS/kits.just when it is wanted and differs
+# kits_just_write: tuteur sync's and upgrade's step: write PATTERNS/kits.just when it is wanted and differs
 kits_just_write() {
   local want
   kits_just_wanted || return 0
   if ! has_pot_kits; then
-    echo "graft: $SCIONS/kits.just: this flake has no pot-kits (no inputs.pot); not written" >&2
+    echo "tuteur: $PATTERNS/kits.just: this flake has no pot-kits (no inputs.pot); not written" >&2
     return 0
   fi
-  if ! want=$(kits_just_text 2>"$GRAFT_TMP/kj.err"); then
-    tail -3 "$GRAFT_TMP/kj.err" >&2
-    echo "graft: $SCIONS/kits.just: the flake's pot-kits doesn't evaluate (above); left as it is" >&2
+  if ! want=$(kits_just_text 2>"$TUTEUR_TMP/kj.err"); then
+    tail -3 "$TUTEUR_TMP/kj.err" >&2
+    echo "tuteur: $PATTERNS/kits.just: the flake's pot-kits doesn't evaluate (above); left as it is" >&2
     return 0
   fi
-  if [ -L "$SCIONS/kits.just" ]; then
-    echo "graft: $SCIONS/kits.just is a symbolic link; graft writes only a file there: remove it, then graft sync" >&2
+  if [ -L "$PATTERNS/kits.just" ]; then
+    echo "tuteur: $PATTERNS/kits.just is a symbolic link; tuteur writes only a file there: remove it, then tuteur sync" >&2
     return 1
   fi
-  if [ ! -f "$SCIONS/kits.just" ] || [ "$(cat "$SCIONS/kits.just")" != "$want" ]; then
+  if [ ! -f "$PATTERNS/kits.just" ] || [ "$(cat "$PATTERNS/kits.just")" != "$want" ]; then
     if [ -n "${POT:-}" ]; then
-      echo "graft: $SCIONS/kits.just is stale: run graft sync on the host (the scions folder is read-only in a run)" >&2
+      echo "tuteur: $PATTERNS/kits.just is stale: run tuteur sync on the host (the patterns folder is read-only in a run)" >&2
       return 0
     fi
-    write_file "$SCIONS/kits.just" "$want" || return 1
-    git add -- "$SCIONS/kits.just" 2>/dev/null || true
-    echo "graft: wrote $SCIONS/kits.just"
+    write_file "$PATTERNS/kits.just" "$want" || return 1
+    git add -- "$PATTERNS/kits.just" 2>/dev/null || true
+    echo "tuteur: wrote $PATTERNS/kits.just"
   fi
   kits_just_clashes "$want" >&2 || true
 }
@@ -170,8 +184,8 @@ kits_just_write() {
 # write_file PATH TEXT: TEXT and a newline into PATH, never through a link (F3): a temporary file beside it, moved over
 write_file() {
   local tmp
-  [ ! -L "$1" ] || { echo "graft: $1 is a symbolic link; graft writes only a file there: remove it, then run graft again" >&2; return 1; }
-  tmp=$(mktemp "$(dirname "$1")/.graft-XXXXXX") || return 1
+  [ ! -L "$1" ] || { echo "tuteur: $1 is a symbolic link; tuteur writes only a file there: remove it, then run tuteur again" >&2; return 1; }
+  tmp=$(mktemp "$(dirname "$1")/.tuteur-XXXXXX") || return 1
   if ! { printf '%s\n' "$2" > "$tmp" && mv -fT -- "$tmp" "$1"; }; then
     rm -f -- "$tmp"
     return 1
@@ -186,7 +200,7 @@ kits_just_clashes() {
   mine=$(sed -nE 's/^@?([A-Za-z][A-Za-z0-9_-]*)( [^:=]*)?:([^=].*)?$/\1/p' justfile | sort -u)
   theirs=$(sed -nE 's/^([A-Za-z][A-Za-z0-9_-]*) \*args:$/\1/p' <<<"$1" | sort -u)
   for n in $(comm -12 <(echo "$mine") <(echo "$theirs")); do
-    echo "graft: $SCIONS/kits.just's recipe $n has the name of the justfile's own $n: rename one (a kit's recipe never replaces yours)"
+    echo "tuteur: $PATTERNS/kits.just's recipe $n has the name of the justfile's own $n: rename one (a kit's recipe never replaces yours)"
     rc=1
   done
   return "$rc"
@@ -199,16 +213,16 @@ flake_update() {
   if [ "$FLAKE" = . ]; then nix_clean flake update "$@"; else nix_clean flake update --flake "$FLAKE_REF" "$@"; fi
 }
 
-# scions_registered [GITMODULES]: name<TAB>path<TAB>url for each submodule that .gitmodules (or the
-# file GITMODULES) registers directly in the scions directory, sorted by name. The submodule's name
-# in .gitmodules doesn't matter; its folder is the scion's name.
-scions_registered() {
+# patterns_registered [GITMODULES]: name<TAB>path<TAB>url for each submodule that .gitmodules (or the
+# file GITMODULES) registers directly in the patterns folder, sorted by name. The submodule's name
+# in .gitmodules doesn't matter; its folder is the pattern's name.
+patterns_registered() {
   local f=${1:-.gitmodules} key p sub
-  [ -n "$SCIONS" ] && [ -f "$f" ] || return 0
+  [ -n "$PATTERNS" ] && [ -f "$f" ] || return 0
   git config -f "$f" --get-regexp '^submodule\..*\.path$' 2>/dev/null | while read -r key p; do
-    [[ $p == "$SCIONS"/* && ${p#"$SCIONS"/} != */* ]] || continue
+    [[ $p == "$PATTERNS"/* && ${p#"$PATTERNS"/} != */* ]] || continue
     sub=${key#submodule.}; sub=${sub%.path}
-    printf '%s\t%s\t%s\n' "${p#"$SCIONS"/}" "$p" "$(git config -f "$f" --get "submodule.$sub.url" 2>/dev/null || true)"
+    printf '%s\t%s\t%s\n' "${p#"$PATTERNS"/}" "$p" "$(git config -f "$f" --get "submodule.$sub.url" 2>/dev/null || true)"
   done | LC_ALL=C sort
 }
 
@@ -238,17 +252,17 @@ newer() { [ "$(printf '%s\n%s\n' "$(semver_key "$1")" "$(semver_key "$2")" | sor
 # header the repo configured for its own server (a CI checkout's token) must never be sent to a provider's.
 tags_of() {
   local url=$1 key out
-  key=$GRAFT_TMP/tags.$(printf '%s' "$url" | cksum | cut -d' ' -f1)
-  if [ -f "$key.fail" ]; then echo "graft: $(cat "$key.fail")" >&2; return 1; fi
+  key=$TUTEUR_TMP/tags.$(printf '%s' "$url" | cksum | cut -d' ' -f1)
+  if [ -f "$key.fail" ]; then echo "tuteur: $(cat "$key.fail")" >&2; return 1; fi
   # inside a pot run, only what the run reaches is tried: no refusal left behind
   if [ ! -f "$key" ] && [ -n "${POT:-}" ] && ! pot_reaches "$url"; then
     echo "$url is not reachable from this pot run" > "$key.fail"
-    echo "graft: $(cat "$key.fail")" >&2
+    echo "tuteur: $(cat "$key.fail")" >&2
     return 1
   fi
   if [ ! -f "$key" ]; then
     out=$(git -c http.extraHeader= ls-remote --tags -- "$url" 2>&1) \
-      || { echo "can't list tags at $url: $(tail -1 <<<"$out")" > "$key.fail"; echo "graft: $(cat "$key.fail")" >&2; return 1; }
+      || { echo "can't list tags at $url: $(tail -1 <<<"$out")" > "$key.fail"; echo "tuteur: $(cat "$key.fail")" >&2; return 1; }
     awk '$2 ~ /^refs\/tags\// { t = substr($2, 11); if (t ~ /\^\{\}$/) { peeled[substr(t, 1, length(t) - 3)] = $1 } else { obj[t] = $1 } }
          END { for (t in obj) print (t in peeled ? peeled[t] : obj[t]), t }' <<<"$out" \
       | while read -r c t; do is_semver "$t" && printf '%s %s\n' "$c" "$t"; done \
@@ -258,10 +272,10 @@ tags_of() {
   cat "$key"
 }
 
-# tags_error URL: why tags_of URL failed in this run (its message, without `graft: `), or nothing
+# tags_error URL: why tags_of URL failed in this run (its message, without `tuteur: `), or nothing
 tags_error() {
   local key
-  key=$GRAFT_TMP/tags.$(printf '%s' "$1" | cksum | cut -d' ' -f1)
+  key=$TUTEUR_TMP/tags.$(printf '%s' "$1" | cksum | cut -d' ' -f1)
   [ ! -f "$key.fail" ] || cat "$key.fail"
 }
 
@@ -282,7 +296,7 @@ version_at() {
   awk -v c="$2" '$1 == c { print $2 }' <<<"$list" | sort -V | tail -1
 }
 
-# local_version_at PATH COMMIT: the same from the tags in the scion's own clone at PATH
+# local_version_at PATH COMMIT: the same from the tags in the pattern's own clone at PATH
 local_version_at() {
   git -C "$1" tag --points-at "$2" 2>/dev/null | while read -r t; do is_semver "$t" && echo "$t"; done | sort -V | tail -1
 }
@@ -294,16 +308,16 @@ tag_commit() {
   awk -v t="$2" '$2 == t { print $1 }' <<<"$list"
 }
 
-# scion_node URL TAG: a flake.lock-like node for a scion, for upstream_range: github: when URL is
+# pattern_node URL TAG: a flake.lock-like node for a pattern, for upstream_range: github: when URL is
 # GitHub's (a compare link), else git
-scion_node() {
+pattern_node() {
   jq -n -c --arg url "$1" --arg ref "$2" '
     ([$url | capture("^https://github\\.com/(?<o>[A-Za-z0-9._-]+)/(?<r>[A-Za-z0-9._-]+?)(\\.git)?/?$")] | .[0]) as $g
     | if $g then {original: {type: "github", owner: $g.o, repo: $g.r, ref: $ref}}
       else {original: {type: "git", url: $url, ref: $ref}} end'
 }
 
-# graft outdated's rows, which graft status reads too (remote, row, scion_pin, report)
+# tuteur outdated's rows, which tuteur status reads too (remote, row, pattern_pin, report)
 
 remote() {  # the git URL of a locked input's upstream
   jq -r 'if .original.type=="github" then "https://github.com/\(.original.owner)/\(.original.repo).git"
@@ -319,8 +333,8 @@ row() {
   local name=$1 dir=$2 url=$3 ref=$4 tags t series latest="" major="" status
   case $ref in
     untagged:*:*)
-      # an untagged scion with a release behind it (git describe): its major's newest is the target
-      # `graft upgrade NAME` takes; the status stays untagged
+      # an untagged pattern with a release behind it (git describe): its major's newest is the target
+      # `tuteur upgrade NAME` takes; the status stays untagged
       t=${ref#untagged:}
       row "$name" "$dir" "$url" "${t#*:}" | awk -F'\t' -v OFS='\t' -v p="${t%%:*}" '{ $3 = p; $5 = "untagged"; print }'
       return ;;
@@ -347,47 +361,64 @@ row() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$name" "$dir" "$ref" "$latest" "$status" "${major:--}"
 }
 
-# scion_pin PATH URL: the pinned tag of the scion at PATH (the gitlink's version upstream), or
+# pattern_pin PATH URL: the pinned tag of the pattern at PATH (the gitlink's version upstream), or
 # untagged:SHA12, or unknown:SHA12 when upstream can't be listed
-scion_pin() {
+pattern_pin() {
   local link v
   link=$(gitlink "$1")
   [ -n "$link" ] || { echo "unknown:-"; return; }
   if ! v=$(version_at "$2" "$link"); then
-    # upstream unreadable: the scion's own tags say what it is, if it's filled
+    # upstream unreadable: the pattern's own tags say what it is, if it's filled
     v=$(local_version_at "$1" "$link"); echo "unknown:${v:-${link:0:12}}"; return
   fi
   if [ -n "$v" ]; then echo "$v"; return; fi
-  # the nearest release behind it, from the scion's own clone (filled only)
+  # the nearest release behind it, from the pattern's own clone (filled only)
   v=$(git -C "$1" describe --tags --abbrev=0 "$link" 2>/dev/null) || v=""
   if is_semver "$v"; then echo "untagged:${link:0:12}:$v"; else echo "untagged:${link:0:12}"; fi
 }
 
-# Rows for graft's own input (DIR `-`), when the flake has one, then for every scion.
+# own_input LOCK: the name of tuteur's own pin among LOCK's root inputs: `tuteur`, else
+# `graft` (graft v2's name, which consumers keep: read through 0.x), else nothing
+own_input() {
+  local lock=$1 n
+  for n in tuteur graft; do
+    if [ -n "$(lock_node "$lock" "$n")" ]; then echo "$n"; return; fi
+  done
+}
+
+# Rows for tuteur's own input and for an input named `pot` pinned at a version tag (DIR `-`, each when the flake
+# has it and no pattern has its name), then for every pattern. pot is the one other input tuteur moves: a
+# consumer that runs under pot takes it to build pot-kits (mkFlake), and it moves by the same rule.
 report() {
-  local n ref url name path
-  n=$(lock_node "$FLAKE_LOCK" graft)
-  if [ -n "$n" ] && ! scions_registered .gitmodules | cut -f1 | grep -qxF graft; then
+  local n ref url name path own
+  own=$(own_input "$FLAKE_LOCK")
+  if [ -n "$own" ] && ! patterns_registered .gitmodules | cut -f1 | grep -qxF "$own"; then
+    n=$(lock_node "$FLAKE_LOCK" "$own")
     ref=$(jq -r '.original.ref // empty' <<<"$n"); url=$(remote "$n")
     if [ -z "$url" ] || ! is_semver "$ref"; then
       ref="untagged:${ref:-$(jq -r '.locked.rev[0:12] // .original.type // "-"' <<<"$n")}"
     fi
-    row graft - "$url" "$ref"
+    row "$own" - "$url" "$ref"
+  fi
+  n=$(lock_node "$FLAKE_LOCK" pot)
+  if [ -n "$n" ] && ! patterns_registered .gitmodules | cut -f1 | grep -qxF pot; then
+    ref=$(jq -r '.original.ref // empty' <<<"$n"); url=$(remote "$n")
+    if [ -n "$url" ] && is_semver "$ref"; then row pot - "$url" "$ref"; fi
   fi
   while IFS=$'\t' read -r name path url; do
     [ -n "$name" ] || continue
-    row "$name" "$SCIONS" "$url" "$(scion_pin "$path" "$url")"
-  done < <(scions_registered .gitmodules)
+    row "$name" "$PATTERNS" "$url" "$(pattern_pin "$path" "$url")"
+  done < <(patterns_registered .gitmodules)
 }
 
 # archive_hash URL TAG REV [EXPORT]: the NAR hash (SRI) of `git archive` of commit REV, fetched from URL by its tag
-# TAG (else by the commit) into a bare repository of graft's own (no checkout: no hooks or filters run), without
+# TAG (else by the commit) into a bare repository of tuteur's own (no checkout: no hooks or filters run), without
 # http.extraHeader. With EXPORT, under the provider's export-ignore and export-subst rules: the tree of GitHub's
 # tarball, and of a git input with exportIgnore; without, a git input's whole tree. Hashed by Nix's own tarball
 # unpacking, through an empty fetch cache. Fails, with the reason on stderr, when it can't.
 archive_hash() {
   local url=$1 tag=$2 rev=$3 ei=${4:-} g out
-  g=$(mktemp -d -p "$GRAFT_TMP") && git init -q --bare "$g/git" || return 1
+  g=$(mktemp -d -p "$TUTEUR_TMP") && git init -q --bare "$g/git" || return 1
   out=$(git -C "$g/git" -c http.extraHeader= fetch -q --depth 1 --no-tags -- "$url" "refs/tags/$tag" 2>&1) || true
   if ! git -C "$g/git" cat-file -e "$rev^{commit}" 2>/dev/null; then
     out=$(git -C "$g/git" -c http.extraHeader= fetch -q --depth 1 --no-tags -- "$url" "$rev" 2>&1) \
@@ -399,7 +430,7 @@ archive_hash() {
     || { tail -1 "$g/err" >&2; return 1; }
 }
 
-# pin_hash_problems: graft check's message (one line, without `graft: `) for each root input of the flake's lock,
+# pin_hash_problems: tuteur check's message (one line, without `tuteur: `) for each root input of the flake's lock,
 # pinned at a version tag (github:, or git), whose narHash is not the NAR hash of its tag's `git archive`
 # (archive_hash): the sign of a lock written through a polluted fetch cache. A pin it can't fetch gets a note on
 # stderr, and no message.
@@ -418,12 +449,12 @@ pin_hash_problems() {
     url=$(remote "$n")
     [ -n "$url" ] || continue
     if [ -n "${POT:-}" ] && ! pot_reaches "$url"; then
-      echo "graft: $url is not reachable from this pot run: $FLAKE_LOCK's narHash for $name not compared with its tag's git archive" >&2
+      echo "tuteur: $url is not reachable from this pot run: $FLAKE_LOCK's narHash for $name not compared with its tag's git archive" >&2
       continue
     fi
-    if ! want=$(archive_hash "$url" "$ref" "$rev" "$ei" 2>"$GRAFT_TMP/ah.err"); then
-      err=$(tail -1 "$GRAFT_TMP/ah.err")
-      echo "graft: can't fetch $name's $ref from $url${err:+ ($err)}: $FLAKE_LOCK's narHash for it not compared with its tag's git archive" >&2
+    if ! want=$(archive_hash "$url" "$ref" "$rev" "$ei" 2>"$TUTEUR_TMP/ah.err"); then
+      err=$(tail -1 "$TUTEUR_TMP/ah.err")
+      echo "tuteur: can't fetch $name's $ref from $url${err:+ ($err)}: $FLAKE_LOCK's narHash for it not compared with its tag's git archive" >&2
       continue
     fi
     [ "$want" = "$nar" ] && continue
@@ -448,18 +479,18 @@ log_tail() {
 
 # full_check REPORT: the repo's whole check (of the flake locate found): each of checks.<system>
 # built on its own (so a failure has a name), then `nix flake check` for the rest (evaluation, other
-# systems' outputs, mkFlake's errors). A git flake reads the committed scions while the tree is
+# systems' outputs, mkFlake's errors). A git flake reads the committed patterns while the tree is
 # clean, so ci upgrade commits first. Logs go to stdout as they run. Fails if anything did, after
 # writing to REPORT one line "nix flake check failed: NAME..." and the last lines of each failing log.
 full_check() {
   local report=$1 system names n log failed=() tails=""
   system=$(nix_ eval --impure --raw --expr builtins.currentSystem)
-  log=$(mktemp -p "$GRAFT_TMP")
+  log=$(mktemp -p "$TUTEUR_TMP")
   if names=$(nix_ eval --json "$FLAKE_REF#checks.$system" --apply builtins.attrNames 2>"$log" | jq -r '.[]'); then
     while IFS= read -r n; do
       [ -n "$n" ] || continue
-      echo "graft: checks.$system.$n"
-      [[ $n =~ ^[A-Za-z0-9_][A-Za-z0-9_\'-]*$ ]] || { echo "graft: (an odd name: left to nix flake check)"; continue; }
+      echo "tuteur: checks.$system.$n"
+      [[ $n =~ ^[A-Za-z0-9_][A-Za-z0-9_\'-]*$ ]] || { echo "tuteur: (an odd name: left to nix flake check)"; continue; }
       if ! nix_ build --no-link -L "$FLAKE_REF#checks.$system.$n" 2>&1 | tee "$log"; then
         failed+=("$n"); tails+="$n:"$'\n'"$(log_tail "$log")"$'\n\n'
         echo "::error::check $n failed on the upgraded tree"
@@ -507,7 +538,7 @@ lock_ref() { jq -r '.original.ref as $o | if $o and .locked.ref and .locked.ref 
 # upstream_range NAME NODE FROM_REV TO_REV FROM_REF TO_REF [STATUS]: what changed upstream for an
 # input (NODE, its flake.lock node, says where it comes from) between two commits, as one JSON
 # object. TO_REV may be empty when TO_REF is a version tag: the tag is fetched and its commit used
-# (graft changelog, which has no lock for the target). A rev must be a full commit hash and a ref a
+# (tuteur changelog, which has no lock for the target). A rev must be a full commit hash and a ref a
 # version tag before git sees it; a ref that isn't one is never fetched: a plain branch name is only
 # shown (`lifecycle at COMMIT`), and when FROM_REF is a version tag, the CHANGELOG.md sections above
 # it at TO_REV are taken (a provider's unreleased major on a branch). STATUS, if given, is reported
@@ -576,7 +607,7 @@ upstream_range() {
   cmp=$(jq -r --arg a "${ot:-$ov}" --arg b "${nt:-$nv}" \
     'if .original.type=="github" then "https://github.com/\(.original.owner)/\(.original.repo)/compare/\($a)...\($b)" else empty end' <<<"$o")
   if [ -z "$nt" ] && [ -n "$branch" ]; then nt="$branch at ${nv:0:12}"; fi
-  jq -n -L "$GRAFT_LIB" --arg name "$name" --arg from "${ot:-${ov:0:12}}" --arg to "${nt:-${nv:0:12}}" \
+  jq -n -L "$TUTEUR_LIB" --arg name "$name" --arg from "${ot:-${ov:0:12}}" --arg to "${nt:-${nv:0:12}}" \
     --arg from_rev "$ov" --arg to_rev "$nv" --arg status "$status" --arg url "$url" --arg compare "$cmp" \
     --rawfile changelog "$tmp/changelog" --rawfile upgrading "$tmp/upgrading" --rawfile rest "$tmp/rest" \
     --rawfile commits "$tmp/commits" --argjson hist "$hist" \

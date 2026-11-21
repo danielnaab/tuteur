@@ -1,63 +1,64 @@
 #!/usr/bin/env bash
 # workflows.sh check|refresh REPO EXAMPLES [RUN [FLAKEDIR [DIR...]]]
 #
-# graft's CI workflows in REPO: each file in REPO/.forgejo/workflows/ named like one in EXAMPLES
-# (graft's template/.forgejo/workflows/, at the version the repo pins) whose text has graft's marker line.
-# graft owns those and nothing else: a workflow without the marker is yours and is never touched,
-# and graft never adds one you didn't copy in.
+# tuteur's CI workflows in REPO: each file in REPO/.forgejo/workflows/ named like one in EXAMPLES
+# (tuteur's template/.forgejo/workflows/, at the version the repo pins) whose text has tuteur's marker line.
+# tuteur owns those and nothing else: a workflow without the marker is yours and is never touched,
+# and tuteur never adds one you didn't copy in.
 #
-#   check    fail, naming each of graft's workflows that differs from EXAMPLES
-#   refresh  replace each of graft's workflows that differs from EXAMPLES with EXAMPLES' copy
+#   check    fail, naming each of tuteur's workflows that differs from EXAMPLES
+#   refresh  replace each of tuteur's workflows that differs from EXAMPLES with EXAMPLES' copy
 #
-# One line of graft's copy is yours: `paths-ignore:` under its `push:` and `pull_request:`
+# One line of tuteur's copy is yours: `paths-ignore:` under its `push:` and `pull_request:`
 # triggers, the globs whose changes alone don't run it (a notes directory a bot pushes to often,
 # say). It is read from the repo's copy and written under both triggers of EXAMPLES' copy before
-# comparing, so it survives `nix run .#graft` and `graft upgrade`. Without one, the file is
+# comparing, so it survives `nix run .#tuteur` and `tuteur upgrade`. Without one, the file is
 # EXAMPLES' copy byte for byte. It is one line, a list of quoted globs:
 #
 #     paths-ignore: ["notebook/**", "drafts/**"]
 #
-# A glob that could match a file graft-check reads is refused, since a push that changes only those
+# A glob that could match a file tuteur-check reads is refused, since a push that changes only those
 # must be checked: one that starts with `*`, `/` or `.forgejo`, and one that could match a file in
-# .forgejo/ or .gitmodules, in a scions directory DIR (default `scions`), or the flake: FLAKEDIR's flake.nix and
+# .forgejo/ or .gitmodules, in a patterns folder DIR (default `patterns`), or the flake: FLAKEDIR's flake.nix and
 # flake.lock at the top (FLAKEDIR `.`, the default), or anything in FLAKEDIR otherwise. Each glob
 # is read as a shell pattern, where `*` and `?` also match `/`, so it errs toward refusing.
 #
-# Another line is yours: `branches:` under `push:`, the branches whose pushes run graft-check. graft's
+# Another line is yours: `branches:` under `push:`, the branches whose pushes run tuteur-check. tuteur's
 # copy says `[main]`; a repo whose default branch has another name writes its own, which is read from
-# the repo's copy and kept, in graft's form (`    branches: [v2]`, names of letters, digits, . _ / -).
+# the repo's copy and kept, in tuteur's form (`    branches: [v2]`, names of letters, digits, . _ / -).
 #
-# One more line is yours: `# graft ssh: ...`, for a repo whose scions include a private ssh one.
+# One more line is yours: `# tuteur ssh: ...`, for a repo whose patterns include a private ssh one.
 # The job's container has no key, and both git (submodule update) and Nix (a git flake fetches every
-# scion to evaluate it) need one, so with this line each of the workflow's steps that runs graft gets
+# pattern to evaluate it) need one, so with this line each of the workflow's steps that runs tuteur gets
 # a step before it that writes an ssh key from an Actions secret, a known_hosts entry and an ssh
-# config for the host. The line (a comment, so it can sit anywhere; graft keeps it above
-# `name:`) names the host as the scion's url spells it, optionally the address it resolves to, the
-# host's public key, and optionally the secret (default GRAFT_SSH_KEY):
+# config for the host. The line (a comment, so it can sit anywhere; tuteur keeps it above
+# `name:`) names the host as the pattern's url spells it, optionally the address it resolves to, the
+# host's public key, and optionally the secret (default TUTEUR_SSH_KEY):
 #
-#     # graft ssh: host=[platform-vm]:2222 address=192.168.1.51 hostkey=ssh-rsa AAAA...
-#     # graft ssh: secret=NOTEBOOK_APP_DEPLOY_KEY host=git.example.com hostkey=ssh-ed25519 AAAA...
+#     # tuteur ssh: host=[platform-vm]:2222 address=192.168.1.51 hostkey=ssh-rsa AAAA...
+#     # tuteur ssh: secret=NOTEBOOK_APP_DEPLOY_KEY host=git.example.com hostkey=ssh-ed25519 AAAA...
 #
 # Without it, the file is EXAMPLES' copy (with any paths-ignore) byte for byte.
 #
-# mkFlake's check and `nix run .#graft` call this with their own examples; graft upgrade calls the
-# copy in the version it moves to, with that version's examples. RUN is how the repo runs graft, for
-# the message (default `nix run .#graft`). Bash, grep, cmp and coreutils only: mkFlake's app has
+# mkFlake's check and `nix run .#tuteur` call this with their own examples; tuteur upgrade calls the
+# copy in the version it moves to, with that version's examples. RUN is how the repo runs tuteur, for
+# the message (default `nix run .#tuteur`). Bash, grep, cmp and coreutils only: mkFlake's app has
 # nothing else.
 set -euo pipefail
 
-mode=$1 repo=$2 examples=$3 run=${4:-nix run .#graft} flakedir=${5:-.}
+mode=$1 repo=$2 examples=$3 run=${4:-nix run .#tuteur} flakedir=${5:-.}
 shift $(($# < 5 ? $# : 5))
-marker='# managed by graft: '   # also lib/common.sh's WORKFLOW_MARKER, which says why there are copies
+marker='# managed by tuteur: '   # also lib/common.sh's WORKFLOW_MARKER, which says why there are copies
+old_marker='# managed by graft: '   # graft v2's, read through 0.1.x: refresh renames graft-NAME.yaml and rewrites it
 rc=0
 case $mode in check|refresh) ;; *) echo "usage: workflows.sh check|refresh REPO EXAMPLES [RUN [FLAKEDIR [DIR...]]]" >&2; exit 2 ;; esac
 
-# What graft-check reads, which no paths-ignore glob may match: a path ending in / is a directory
+# What tuteur-check reads, which no paths-ignore glob may match: a path ending in / is a directory
 # (any file in it), any other a file.
 flakedir=${flakedir%/}
 if [ -z "$flakedir" ] || [ "$flakedir" = . ]; then protected=(flake.nix flake.lock); else protected=("$flakedir/"); fi
 protected+=(.forgejo/ .gitmodules)
-if [ $# -eq 0 ]; then set -- scions; fi
+if [ $# -eq 0 ]; then set -- .patterns; fi
 for d in "$@"; do protected+=("${d%/}/"); done
 
 # could_match GLOB PATH: whether GLOB, read as a shell pattern, matches PATH, or (PATH ending in /)
@@ -73,74 +74,74 @@ could_match() {
   return 1
 }
 
-# A symlink could point anywhere: graft only writes regular files inside the repo.
+# A symlink could point anywhere: tuteur only writes regular files inside the repo.
 for d in .forgejo .forgejo/workflows; do
-  [ ! -L "$repo/$d" ] || { echo "graft: $d is a symlink; not reading workflows through it" >&2; exit 1; }
+  [ ! -L "$repo/$d" ] || { echo "tuteur: $d is a symlink; not reading workflows through it" >&2; exit 1; }
 done
 
-# paths_ignore FILE WF: FILE's paths-ignore line as graft writes it (`    paths-ignore: ["a", "b"]`),
-# or nothing when it has none. Fails, saying why, on a line graft can't read, or two that differ.
+# paths_ignore FILE WF: FILE's paths-ignore line as tuteur writes it (`    paths-ignore: ["a", "b"]`),
+# or nothing when it has none. Fails, saying why, on a line tuteur can't read, or two that differ.
 paths_ignore() {
   local file=$1 wf=$2 line want="" got item parts globs p
   local form='one line under push: and pull_request:, a list of quoted globs and no comment after it, like paths-ignore: ["notebook/**"]'
   while IFS= read -r line || [ -n "$line" ]; do
     [[ $line =~ ^[[:space:]]*paths-ignore: ]] || continue
     [[ $line =~ ^\ \ \ \ paths-ignore:\ *\[(.*)\][[:space:]]*$ ]] \
-      || { echo "graft: $wf: can't read its paths-ignore; write it as $form" >&2; return 1; }
+      || { echo "tuteur: $wf: can't read its paths-ignore; write it as $form" >&2; return 1; }
     IFS=, read -ra parts <<<"${BASH_REMATCH[1]}"
     globs=()
     for item in "${parts[@]}"; do
       item=${item#"${item%%[![:space:]]*}"} item=${item%"${item##*[![:space:]]}"}
       if [[ $item =~ ^\"([^\"]*)\"$ || $item =~ ^\'([^\']*)\'$ ]]; then item=${BASH_REMATCH[1]}; else
-        echo "graft: $wf: can't read its paths-ignore; write it as $form" >&2; return 1
+        echo "tuteur: $wf: can't read its paths-ignore; write it as $form" >&2; return 1
       fi
       [[ $item =~ ^[A-Za-z0-9._/*?-]+$ ]] \
-        || { echo "graft: $wf: paths-ignore glob \"$item\": use only letters, digits, . _ / * ? and -" >&2; return 1; }
+        || { echo "tuteur: $wf: paths-ignore glob \"$item\": use only letters, digits, . _ / * ? and -" >&2; return 1; }
       [[ ! $item =~ ^(\*|/|\.forgejo) ]] \
-        || { echo "graft: $wf: paths-ignore glob \"$item\" could match graft's own files (it starts with *, / or .forgejo); name a directory, like \"notebook/**\"" >&2; return 1; }
+        || { echo "tuteur: $wf: paths-ignore glob \"$item\" could match tuteur's own files (it starts with *, / or .forgejo); name a directory, like \"notebook/**\"" >&2; return 1; }
       for p in "${protected[@]}"; do
         ! could_match "$item" "$p" \
-          || { echo "graft: $wf: paths-ignore glob \"$item\" could match $p, which graft-check reads; name another directory, like \"notebook/**\"" >&2; return 1; }
+          || { echo "tuteur: $wf: paths-ignore glob \"$item\" could match $p, which tuteur-check reads; name another directory, like \"notebook/**\"" >&2; return 1; }
       done
       globs+=("\"$item\"")
     done
-    [ ${#globs[@]} -gt 0 ] || { echo "graft: $wf: its paths-ignore is empty; delete the line instead" >&2; return 1; }
+    [ ${#globs[@]} -gt 0 ] || { echo "tuteur: $wf: its paths-ignore is empty; delete the line instead" >&2; return 1; }
     got="    paths-ignore: ["
     for item in "${globs[@]}"; do got+="$item, "; done
     got="${got%, }]"
     if [ -z "$want" ]; then want=$got
     elif [ "$want" != "$got" ]; then
-      echo "graft: $wf: its paths-ignore lines differ; make them the same" >&2; return 1
+      echo "tuteur: $wf: its paths-ignore lines differ; make them the same" >&2; return 1
     fi
   done < "$file"
   printf '%s' "$want"
 }
 
-# push_branches FILE WF: FILE's `branches:` line under `push:` in graft's form (`    branches: [a, b]`),
-# or nothing when it has none. Fails, saying why, on a line graft can't read, or two that differ.
+# push_branches FILE WF: FILE's `branches:` line under `push:` in tuteur's form (`    branches: [a, b]`),
+# or nothing when it has none. Fails, saying why, on a line tuteur can't read, or two that differ.
 push_branches() {
   local file=$1 wf=$2 line want="" got item parts brs
   local form='one line under push:, a list of branch names and no comment after it, like branches: [main]'
   while IFS= read -r line || [ -n "$line" ]; do
     [[ $line =~ ^[[:space:]]*branches: ]] || continue
     [[ $line =~ ^\ \ \ \ branches:\ *\[(.*)\][[:space:]]*$ ]] \
-      || { echo "graft: $wf: can't read its branches; write it as $form" >&2; return 1; }
+      || { echo "tuteur: $wf: can't read its branches; write it as $form" >&2; return 1; }
     IFS=, read -ra parts <<<"${BASH_REMATCH[1]}"
     brs=()
     for item in "${parts[@]}"; do
       item=${item#"${item%%[![:space:]]*}"} item=${item%"${item##*[![:space:]]}"}
       if [[ $item =~ ^\"([^\"]*)\"$ || $item =~ ^\'([^\']*)\'$ ]]; then item=${BASH_REMATCH[1]}; fi
       [[ $item =~ ^[A-Za-z0-9._/-]+$ ]] \
-        || { echo "graft: $wf: branch \"$item\": use only letters, digits, . _ / and -; write it as $form" >&2; return 1; }
+        || { echo "tuteur: $wf: branch \"$item\": use only letters, digits, . _ / and -; write it as $form" >&2; return 1; }
       brs+=("$item")
     done
-    [ ${#brs[@]} -gt 0 ] || { echo "graft: $wf: its branches list is empty; write it as $form" >&2; return 1; }
+    [ ${#brs[@]} -gt 0 ] || { echo "tuteur: $wf: its branches list is empty; write it as $form" >&2; return 1; }
     got="    branches: ["
     for item in "${brs[@]}"; do got+="$item, "; done
     got="${got%, }]"
     if [ -z "$want" ]; then want=$got
     elif [ "$want" != "$got" ]; then
-      echo "graft: $wf: it has two branches lines that differ; keep one, under push:" >&2; return 1
+      echo "tuteur: $wf: it has two branches lines that differ; keep one, under push:" >&2; return 1
     fi
   done < "$file"
   printf '%s' "$want"
@@ -156,12 +157,12 @@ with_branches() {
   [ -n "$hit" ]
 }
 
-# ssh_parse LINE: the fields of a `# graft ssh:` line into SSH_SECRET SSH_HOST SSH_ALIAS SSH_ADDR
+# ssh_parse LINE: the fields of a `# tuteur ssh:` line into SSH_SECRET SSH_HOST SSH_ALIAS SSH_ADDR
 # SSH_HOSTKEY, each checked to be plain enough to sit in YAML and single-quoted shell; fails,
-# saying why, otherwise. ssh_form is the line in graft's form.
+# saying why, otherwise. ssh_form is the line in tuteur's form.
 ssh_parse() {
-  local rest=${1#*graft ssh:} toks tok key="" val
-  SSH_SECRET=GRAFT_SSH_KEY SSH_HOST="" SSH_ALIAS="" SSH_ADDR="" SSH_HOSTKEY=""
+  local rest=${1#*ssh:} toks tok key="" val
+  SSH_SECRET=TUTEUR_SSH_KEY SSH_HOST="" SSH_ALIAS="" SSH_ADDR="" SSH_HOSTKEY=""
   read -ra toks <<<"$rest"   # read, not $rest unquoted: [host]:port is a glob
   for tok in "${toks[@]}"; do
     if [[ $tok =~ ^(secret|host|address|hostkey)= ]]; then   # (a key's base64 may end in =)
@@ -184,45 +185,47 @@ ssh_parse() {
     || { echo "hostkey= must be the host's public key, TYPE KEY (as in its .pub file, no comment)"; return 1; }
 }
 ssh_form() {
-  local f="# graft ssh:"
-  [ "$SSH_SECRET" = GRAFT_SSH_KEY ] || f+=" secret=$SSH_SECRET"
+  local f="# tuteur ssh:"
+  [ "$SSH_SECRET" = TUTEUR_SSH_KEY ] || f+=" secret=$SSH_SECRET"
   f+=" host=$SSH_HOST"
   [ -z "$SSH_ADDR" ] || f+=" address=$SSH_ADDR"
   printf '%s hostkey=%s' "$f" "$SSH_HOSTKEY"
 }
 
-# ssh_line FILE WF: FILE's `# graft ssh:` line in graft's form, or nothing when it has none. Fails,
-# saying why, on a line graft can't read, or two that differ.
+# ssh_line FILE WF: FILE's `# tuteur ssh:` line in tuteur's form, or nothing when it has none. Fails,
+# saying why, on a line tuteur can't read, or two that differ.
 ssh_line() {
   local file=$1 wf=$2 line want="" got why
-  local form='# graft ssh: host=[HOST]:PORT address=ADDRESS hostkey=TYPE KEY (address= and secret=NAME optional)'
+  local form='# tuteur ssh: host=[HOST]:PORT address=ADDRESS hostkey=TYPE KEY (address= and secret=NAME optional)'
   while IFS= read -r line || [ -n "$line" ]; do
-    [[ $line =~ ^[[:space:]]*#[[:space:]]*graft\ ssh: ]] || continue
-    why=$(ssh_parse "$line") || { echo "graft: $wf: its \"# graft ssh:\" line: $why; write it as $form" >&2; return 1; }
+    [[ $line =~ ^[[:space:]]*#[[:space:]]*(tuteur|graft)\ ssh: ]] || continue
+    why=$(ssh_parse "$line") || { echo "tuteur: $wf: its \"# tuteur ssh:\" line: $why; write it as $form" >&2; return 1; }
     ssh_parse "$line" >/dev/null
     got=$(ssh_form)
     if [ -z "$want" ]; then want=$got
     elif [ "$want" != "$got" ]; then
-      echo "graft: $wf: its \"# graft ssh:\" lines differ; keep one" >&2; return 1
+      echo "tuteur: $wf: its \"# tuteur ssh:\" lines differ; keep one" >&2; return 1
     fi
   done < "$file"
   printf '%s' "$want"
 }
 
-# ssh_step: the step a `# graft ssh:` line asks for (ssh_parse's fields), and a blank line after it
+# ssh_step: the step a `# tuteur ssh:` line asks for (ssh_parse's fields), and a blank line after it
 ssh_step() {
-  local cfg="'Host $SSH_ALIAS'" names=$SSH_HOST
+  local cfg="'Host $SSH_ALIAS'" names=$SSH_HOST secret="secrets.$SSH_SECRET" what="the $SSH_SECRET secret"
+  # the default secret, TUTEUR_SSH_KEY, else graft's GRAFT_SSH_KEY (an org setting, read through 0.1.x)
+  if [ "$SSH_SECRET" = TUTEUR_SSH_KEY ]; then secret="secrets.TUTEUR_SSH_KEY || secrets.GRAFT_SSH_KEY" what="the TUTEUR_SSH_KEY secret (or GRAFT_SSH_KEY)"; fi
   # ssh looks the key up under the name it connects to: with an address, that's the address
   if [ -n "$SSH_ADDR" ]; then cfg+=" '  HostName $SSH_ADDR'" names+=",${SSH_HOST/"$SSH_ALIAS"/"$SSH_ADDR"}"; fi
   cat <<EOF
-      - name: SSH key for private scions
-        # graft writes this step from the "# graft ssh:" line at the top of this file
+      - name: SSH key for private patterns
+        # tuteur writes this step from the "# tuteur ssh:" line at the top of this file
         env:
-          GRAFT_SSH_KEY: \${{ secrets.$SSH_SECRET }}
+          TUTEUR_SSH_KEY: \${{ $secret }}
         run: |
           set -euo pipefail
-          if [ -z "\$GRAFT_SSH_KEY" ]; then
-            echo "::error::the $SSH_SECRET secret is empty or not set"; exit 1
+          if [ -z "\$TUTEUR_SSH_KEY" ]; then
+            echo "::error::$what is empty or not set"; exit 1
           fi
           # nixos/nix has an ssh client; another image may not
           if ! command -v ssh >/dev/null; then
@@ -230,29 +233,29 @@ ssh_step() {
             echo "\$ssh_pkg/bin" >> "\$GITHUB_PATH"
           fi
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
-          printf '%s\n' "\$GRAFT_SSH_KEY" > ~/.ssh/graft_scions && chmod 600 ~/.ssh/graft_scions
+          printf '%s\n' "\$TUTEUR_SSH_KEY" > ~/.ssh/tuteur_patterns && chmod 600 ~/.ssh/tuteur_patterns
           echo '$names $SSH_HOSTKEY' >> ~/.ssh/known_hosts
-          printf '%s\n' $cfg '  IdentityFile ~/.ssh/graft_scions' '  IdentitiesOnly yes' \\
+          printf '%s\n' $cfg '  IdentityFile ~/.ssh/tuteur_patterns' '  IdentitiesOnly yes' \\
             '  StrictHostKeyChecking yes' '  CheckHostIP no' '  BatchMode yes' >> ~/.ssh/config
 
 EOF
 }
 
-# The steps of graft's workflows that run graft (and so fetch scions)
-graft_steps=("      - name: Scions registered and at release tags"
-             "      - name: Upgrade, check the result, push it to graft/upgrade"
+# The steps of tuteur's workflows that run tuteur (and so fetch patterns)
+tuteur_steps=("      - name: Patterns registered and at release tags"
+             "      - name: Upgrade, check the result, push it to tuteur/upgrade"
              "      - name: Open (or update) the PR"
              "      - name: Signers (report-only)")
 
-# render_ssh FILE LINE: FILE with LINE (a `# graft ssh:` line, graft's form) above its first line
-# that isn't a comment, and ssh_step before each step that runs graft. Fails, saying why, when FILE
+# render_ssh FILE LINE: FILE with LINE (a `# tuteur ssh:` line, tuteur's form) above its first line
+# that isn't a comment, and ssh_step before each step that runs tuteur. Fails, saying why, when FILE
 # has none.
 render_ssh() {
   local file=$1 line top="" step="" l s
   ssh_parse "$2" >/dev/null || return 1
   while IFS= read -r l || [ -n "$l" ]; do
     if [ -z "$top" ] && [[ ! $l =~ ^# ]]; then printf '%s\n' "$2"; top=1; fi
-    for s in "${graft_steps[@]}"; do if [ "$l" = "$s" ]; then ssh_step; step=1; fi; done
+    for s in "${tuteur_steps[@]}"; do if [ "$l" = "$s" ]; then ssh_step; step=1; fi; done
     printf '%s\n' "$l"
   done < "$file"
   [ -n "$step" ]
@@ -287,8 +290,16 @@ trap 'rm -f "$want" "$want.ssh" "$want.br"' EXIT
 for src in "$examples"/*; do
   [ -f "$src" ] || continue
   wf=.forgejo/workflows/${src##*/}
-  if [ ! -f "$repo/$wf" ] || [ -L "$repo/$wf" ] || ! grep -q "^$marker" "$repo/$wf"; then continue; fi
-  kept="graft: (paths-ignore, branches and the ssh line are the only edits graft keeps in $wf; to keep others, delete its \"$marker\" line)"
+  # graft's copy of this workflow (graft-NAME.yaml, its marker): refresh renames it (sync, in the migration from graft)
+  gwf=.forgejo/workflows/graft-${src##*/tuteur-}
+  if [ "$mode" = refresh ] && [ ! -e "$repo/$wf" ] && [ "$gwf" != "$wf" ] && [ -f "$repo/$gwf" ] && [ ! -L "$repo/$gwf" ] \
+      && grep -q "^$old_marker" "$repo/$gwf"; then
+    mv -- "$repo/$gwf" "$repo/$wf"
+    git -C "$repo" add -A -- "$gwf" "$wf" 2>/dev/null || true
+    echo "tuteur: renamed $gwf to $wf"
+  fi
+  if [ ! -f "$repo/$wf" ] || [ -L "$repo/$wf" ] || ! grep -qE "^($marker|$old_marker)" "$repo/$wf"; then continue; fi
+  kept="tuteur: (paths-ignore, branches and the ssh line are the only edits tuteur keeps in $wf; to keep others, delete its \"$marker\" line)"
   if ! pi=$(paths_ignore "$repo/$wf" "$wf"); then
     echo "$kept" >&2
     rc=1; continue
@@ -303,19 +314,19 @@ for src in "$examples"/*; do
   fi
   render "$src" "$pi" > "$want"
   if [ -n "$pi" ] && ! grep -qxF -- "$pi" "$want"; then
-    echo "graft: $wf: its paths-ignore is kept only under push: and pull_request:, and this graft version's copy has neither; delete the line" >&2
+    echo "tuteur: $wf: its paths-ignore is kept only under push: and pull_request:, and this tuteur version's copy has neither; delete the line" >&2
     rc=1; continue
   fi
   if [ -n "$br" ]; then
     if ! with_branches "$want" "$br" > "$want.br"; then
-      echo "graft: $wf: its branches line is kept only under push:, and this graft version's copy has none; delete the line" >&2
+      echo "tuteur: $wf: its branches line is kept only under push:, and this tuteur version's copy has none; delete the line" >&2
       rc=1; continue
     fi
     mv "$want.br" "$want"
   fi
   if [ -n "$sl" ]; then
     if ! render_ssh "$want" "$sl" > "$want.ssh"; then
-      echo "graft: $wf: its \"# graft ssh:\" line is kept only in a workflow with a step that runs graft, and this graft version's copy has none; delete the line" >&2
+      echo "tuteur: $wf: its \"# tuteur ssh:\" line is kept only in a workflow with a step that runs tuteur, and this tuteur version's copy has none; delete the line" >&2
       rc=1; continue
     fi
     mv "$want.ssh" "$want"
@@ -323,12 +334,12 @@ for src in "$examples"/*; do
   if cmp -s "$want" "$repo/$wf"; then continue; fi
   case $mode in
     check)
-      echo "graft: $wf differs from the copy this graft version ships; run: $run" >&2
-      echo "graft: (to keep your own edits, delete its \"$marker\" line; graft then leaves it alone)" >&2
+      echo "tuteur: $wf differs from the copy this tuteur version ships; run: $run" >&2
+      echo "tuteur: (to keep your own edits, delete its \"$marker\" line; tuteur then leaves it alone)" >&2
       rc=1 ;;
     refresh)
       cp --no-preserve=mode "$want" "$repo/$wf"
-      echo "graft: refreshed $wf" ;;
+      echo "tuteur: refreshed $wf" ;;
   esac
 done
 exit "$rc"

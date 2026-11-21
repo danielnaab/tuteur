@@ -33,10 +33,24 @@
         "type": "github"
       }
     },
+    "pot": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1795296575,
+        "narHash": "sha256-SVCWiIRNHhBEgYhd17g3OOhQFQ7WTZ9p0J/V+kDo0Jk=",
+        "path": "/home/daniel/src/pot",
+        "type": "path"
+      },
+      "original": {
+        "path": "/home/daniel/src/pot",
+        "type": "path"
+      }
+    },
     "root": {
       "inputs": {
         "knowledge-base-kit": "knowledge-base-kit",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "pot": "pot"
       }
     }
   },

@@ -1,4 +1,4 @@
-# migrate.jq: the text of graft migrate's brief, from the JSON migrate.sh assembles (what --json
+# migrate.jq: the text of tuteur migrate's brief, from the JSON migrate.sh assembles (what --json
 # prints). Provider text arrives only through that JSON and leaves as a block quote (upstream.jq);
 # paths and logs as indented code blocks, which no line in them can close.
 
@@ -10,33 +10,33 @@ def delta: [if .added then "+\(.added)" else empty end, if .deleted and .deleted
   | if length > 0 then "   (\(join(" ")))" else "" end;
 
 . as $b
-| ($b.scion_dirs | map(safe + "/")) as $dirs
-| (if ($dirs | length) > 0 then $dirs | list else "the scions directory" end) as $dirtext
+| ($b.pattern_dirs | map(safe + "/")) as $dirs
+| (if ($dirs | length) > 0 then $dirs | list else "the patterns folder" end) as $dirtext
 | ($b.branch // "HEAD (\($b.head))") as $branch
 # the flake: at the top, or in a subdirectory (mkFlake's flakeDir), run as a path: flake
 | (if $b.flake then "\($b.flake | safe)/" else "" end) as $fp
-| (if $b.flake then "`nix run 'path:\($b.flake | safe)#graft' check` and `nix flake check 'path:\($b.flake | safe)'`"
+| (if $b.flake then "`nix run 'path:\($b.flake | safe)#tuteur' check` and `nix flake check 'path:\($b.flake | safe)'`"
    else "`nix flake check`" end) as $check
 | (if $b.flake_nix_moved then "\($fp)flake.nix, \($fp)flake.lock" else "\($fp)flake.lock" end) as $pins
 | (if $b.flake then "pass" else "passes" end) as $pass
 | (if $b.flake then "fail" else "fails" end) as $fail
 | if $b.nothing_moved then
-    "graft migrate: nothing moved since \($b.base.commit[0:12]) (the merge-base with \($b.base.ref | safe)): graft's and the scions' pins and \($dirtext) are as they were. No migration to do."
+    "tuteur migrate: nothing moved since \($b.base.commit[0:12]) (the merge-base with \($b.base.ref | safe)): tuteur's and the patterns' pins and \($dirtext) are as they were. No migration to do."
   else
   # 1. the header
   (if ($b.moved | length) == 0 then
-     "No pin graft manages moved since \($b.base.commit[0:12]) (the merge-base with \($b.base.ref | safe)), but \($dirtext) changed: bring this repo (\($b.repo | safe)) in line with what changed below."
+     "No pin tuteur manages moved since \($b.base.commit[0:12]) (the merge-base with \($b.base.ref | safe)), but \($dirtext) changed: bring this repo (\($b.repo | safe)) in line with what changed below."
    else
   "Migrate this repo (\($b.repo | safe)) to \($b.moved | map(if .status == "added" then "\(.name | safe) \(.to | safe) (new)" elif .status == "removed" then "no \(.name | safe) (removed)" else "\(.name | safe) \(.to | safe) (from \(.from | safe))" end) | list)."
    end),
   (if $b.applied == "committed" then
      "Branch \($branch | safe) already has the upgrade committed (\($pins) and \($dirtext)); fix this repo's own files only."
    else
-     "The upgrade is applied on \($branch | safe) but not committed (\($pins) and \($dirtext)); fix this repo's own files only. \(if $b.flake then "graft sees only files git would commit" else "Nix sees only files git tracks" end): `git add` new ones before \($check)."
+     "The upgrade is applied on \($branch | safe) but not committed (\($pins) and \($dirtext)); fix this repo's own files only. \(if $b.flake then "tuteur sees only files git would commit" else "Nix sees only files git tracks" end): `git add` new ones before \($check)."
    end),
-  "Don't edit the scions in \($dirtext)\(if ($b.graft_workflows | length) > 0 then " or graft's workflows (\($b.graft_workflows | map(safe) | list))" else "" end), and don't move the pins (the scions' commits, graft's in \($fp)flake.nix and \($fp)flake.lock): they are the upgrade. A scion that needs a fix is a provider change: make it in the provider, release it, then graft upgrade.",
+  "Don't edit the patterns in \($dirtext)\(if ($b.tuteur_workflows | length) > 0 then " or tuteur's workflows (\($b.tuteur_workflows | map(safe) | list))" else "" end), and don't move the pins (the patterns' commits, tuteur's in \($fp)flake.nix and \($fp)flake.lock): they are the upgrade. A pattern that needs a fix is a provider change: make it in the provider, release it, then tuteur upgrade.",
   (if ($b.also_moved | length) > 0 then
-     "Also moved, not by graft: \($b.also_moved | map("\(.name | safe) \(.from | safe) -> \(.to | safe)") | list)."
+     "Also moved, not by tuteur: \($b.also_moved | map("\(.name | safe) \(.from | safe) -> \(.to | safe)") | list)."
    else empty end),
   "",
 
@@ -94,5 +94,5 @@ def delta: [if .added then "+\(.added)" else empty end, if .deleted and .deleted
   # 6. done when
   "## Done when",
   "",
-  "\($check) \($pass), with \($dirtext) and the pins as graft left them. Commit on the branch you're on (this brief was made on \($branch | safe)), one line per file changed in the message. If nothing here needs to change, say so and commit nothing.\(if $b.branch == "graft/upgrade" then " The weekly graft upgrade run force-pushes graft/upgrade: work on a branch made from it, or merge before then." else "" end)"
+  "\($check) \($pass), with \($dirtext) and the pins as tuteur left them. Commit on the branch you're on (this brief was made on \($branch | safe)), one line per file changed in the message. If nothing here needs to change, say so and commit nothing.\(if $b.branch == "tuteur/upgrade" then " The weekly tuteur upgrade run force-pushes tuteur/upgrade: work on a branch made from it, or merge before then." else "" end)"
   end

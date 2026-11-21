@@ -1,26 +1,29 @@
 #!/usr/bin/env bash
 # tools.sh outdated|upgrade|changelog [-C REPO] [--json] [NAME[@TAG]...]
 #
-#   outdated  for graft itself and each scion, its pinned tag, the newest tag upstream within that
-#             major version, and the newest of a later major if there is one.
+#   outdated  for tuteur itself, an input named pot (at a version tag) and each pattern, its pinned tag,
+#             the newest tag upstream within that series (its major; below 1.0, its 0.y), and the newest
+#             of a later series (a breaking version) if there is one.
 #   upgrade   move each named one (default: every outdated one) to TAG (default: the newest of
 #             its pinned major). Prints nothing to do when nothing is. Only NAME@TAG crosses a
-#             major version. NAME `graft` is the repo's graft input: it moves first (flake.nix and
-#             flake.lock), then the new version writes its scions README and workflows.
+#             series. NAME `tuteur` (or `graft`) is the repo's own tuteur input: it moves first (flake.nix
+#             and flake.lock), then the new version writes its patterns README and workflows (its
+#             lib/refresh.sh). NAME `pot` moves flake.nix and flake.lock alone.
 #   changelog what upgrade would take, before taking it: each named one's (default: each outdated
 #             one's) CHANGELOG.md sections between its pinned tag and TAG (default: the newest of
 #             its pinned major), Upgrading subsections first, or its commits. Changes nothing.
 #
-# All three read the repo as data. A scion's pin is its gitlink (the commit the index records) and
+# All three read the repo as data. A pattern's pin is its gitlink (the commit the index records) and
 # its upstream the URL in .gitmodules; its version is the highest semver tag upstream at that commit
-# (none: `untagged`). graft's own pin is the flake input named `graft` in flake.lock.
+# (none: `untagged`). tuteur's own pin is the flake input named `tuteur` in flake.lock, else the one
+# named `graft` (graft v2's name, read through 0.x).
 #
-# Moving a scion: refused when its checkout has uncommitted edits or sits at another commit than
-# the gitlink. An initialised scion fetches the tag and checks it out, and the gitlink is staged
+# Moving a pattern: refused when its checkout has uncommitted edits or sits at another commit than
+# the gitlink. An initialised pattern fetches the tag and checks it out, and the gitlink is staged
 # (git add); an uninitialised one (a CI checkout) gets the gitlink written straight into the index
 # (git update-index), which Nix builds once committed. .gitmodules is never touched.
 #
-# Only tags shaped like semver (v1.2.3 or 1.2.3) count as versions. A new major version is the
+# Only tags shaped like semver (v1.2.3 or 1.2.3) count as versions. A breaking version (a new major) is the
 # provider saying it breaks something, so nothing crosses one by itself: the default target is the
 # newest tag of the pinned major, and a later major is only reported until it's named. A 0.y series
 # is its own major (semver's 0.x, as Cargo reads it): 0.3.1 moves to 0.3.4 by itself, never to 0.4.0.
@@ -33,17 +36,21 @@ here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # flake.lock's node for a root input, as JSON, or nothing.
 node() { lock_node "$FLAKE_LOCK" "$1"; }
 
-# URLS: name<TAB>url for every row (graft's, then the scions'), for upgrade and changelog
+# URLS: name<TAB>url for every row (tuteur's, then the patterns'), for upgrade and changelog
 declare -A URLS=() PATHS=()
 
+# OWN: the name of tuteur's own input (own_input: tuteur, else graft), or ""
+OWN=""
 urls() {
   local name path url n
-  n=$(node graft)
-  if [ -n "$n" ]; then URLS[graft]=$(remote "$n"); fi
+  OWN=$(own_input "$FLAKE_LOCK")
+  if [ -n "$OWN" ]; then URLS[$OWN]=$(remote "$(node "$OWN")"); fi
+  n=$(node pot)
+  if [ -n "$n" ]; then URLS[pot]=$(remote "$n"); fi
   while IFS=$'\t' read -r name path url; do
     [ -n "$name" ] || continue
     URLS[$name]=$url PATHS[$name]=$path
-  done < <(scions_registered .gitmodules)
+  done < <(patterns_registered .gitmodules)
 }
 
 cmd_outdated() {
@@ -53,11 +60,11 @@ cmd_outdated() {
     jq -R -s -c 'split("\n") | map(select(length>0) | split("\t")
       | {name:.[0], dir:.[1], pinned:.[2], latest:.[3], status:.[4], major:(if .[5]=="-" then null else .[5] end)})' <<<"$rows"
   elif [ -z "$rows" ]; then
-    echo "graft: no scions here (no README.md carrying graft's marker), and no graft input"
+    echo "tuteur: no patterns here (no README.md carrying tuteur's marker), and no tuteur input"
   else
-    { echo -e "NAME\tDIR\tPINNED\tLATEST\tSTATUS\tMAJOR"; echo "$rows"; } | column -t -s $'\t'
+    { echo -e "NAME\tDIR\tPINNED\tLATEST\tSTATUS\tBREAKING"; echo "$rows"; } | column -t -s $'\t'
     if grep -q $'\t[^\t]*[0-9]$' <<<"$rows"; then
-      echo "MAJOR: a newer major version, which graft upgrade takes only when named (NAME@TAG): read its CHANGELOG first"
+      echo "BREAKING: a breaking version (a new major, or a new 0.y below 1.0), which tuteur upgrade takes only when named (NAME@TAG): read its CHANGELOG first"
     fi
   fi
 }
@@ -85,22 +92,22 @@ retarget() {
   printf '%s\n' "$text" > "$FLAKE_NIX"
 }
 
-# The source of graft at TAG on the upstream of the repo's `graft` input.
-graft_src() {
+# The source of tuteur at TAG on the upstream of the repo's own input (OWN).
+tuteur_src() {
   local n ref tag=$1 path
-  n=$(node graft)
+  n=$(node "$OWN")
   ref=$(jq -r --arg t "$tag" 'if .original.type=="github" then "github:\(.original.owner)/\(.original.repo)/\($t)"
                               elif .original.type=="git" then "git+\(.original.url)?ref=\($t)"
                               else empty end' <<<"$n")
-  [ -n "$ref" ] || die "can't fetch this repo's graft input ($(jq -r .locked.type <<<"$n"))"
+  [ -n "$ref" ] || die "can't fetch this repo's tuteur input ($(jq -r .locked.type <<<"$n"))"
   # through an empty fetch cache, as flake_update re-locks it: the tag's own tree
-  path=$(nix_clean flake prefetch --json "$ref" | jq -r .storePath) || die "can't fetch graft at $ref"
+  path=$(nix_clean flake prefetch --json "$ref" | jq -r .storePath) || die "can't fetch tuteur at $ref"
   echo "$path"
 }
 
-# move_scion NAME PATH URL TAG: check out TAG in the scion (initialised) or write the gitlink
+# move_pattern NAME PATH URL TAG: check out TAG in the pattern (initialised) or write the gitlink
 # (uninitialised), staged either way
-move_scion() {
+move_pattern() {
   local name=$1 path=$2 url=$3 tag=$4 commit
   commit=$(tag_commit "$url" "$tag") || exit 1
   [ -n "$commit" ] || die "$name: no tag $tag upstream"
@@ -112,7 +119,7 @@ move_scion() {
     git -C "$path" -c advice.detachedHead=false checkout -q --detach "$commit"
     # its own submodules at the commits the new version records (Nix reads them from the working
     # tree while the repo's tree has a modified file)
-    git -C "$path" submodule update -q --init --recursive || echo "graft: $name: can't fill its own submodules (see above)" >&2
+    git -C "$path" submodule update -q --init --recursive || echo "tuteur: $name: can't fill its own submodules (see above)" >&2
     git add -- "$path"
   else
     git update-index --cacheinfo "160000,$commit,$path"
@@ -120,22 +127,22 @@ move_scion() {
 }
 
 cmd_upgrade() {
-  local rows want=() name dir pinned latest status major target named spec plan=() held=() src="" moved_graft="" text path dirt
+  local rows want=() name dir pinned latest status major target named spec plan=() held=() src="" moved_tuteur="" text path dirt inputs=()
   rows=$(report)
   urls
   for spec in "$@"; do want+=("$spec"); done
   if [ ${#want[@]} -gt 0 ]; then
     for spec in "${want[@]}"; do
-      cut -f1 <<<"$rows" | grep -qxF -- "${spec%%@*}" || die "no scion (or graft input) named ${spec%%@*}"
+      cut -f1 <<<"$rows" | grep -qxF -- "${spec%%@*}" || die "no pattern (or tuteur input) named ${spec%%@*}"
     done
   fi
-  # Decide everything first, and check every scion can move, before changing any file.
+  # Decide everything first, and check every pattern can move, before changing any file.
   while IFS=$'\t' read -r name dir pinned latest status major; do
     [ -n "$name" ] || continue
     target="" named=""
     # a later major is reported, never taken unless named
     if [ "$major" != - ] && { [ ${#want[@]} -eq 0 ] || printf '%s\n' "${want[@]}" | grep -qxF -- "$name"; }; then
-      held+=("graft: $name: $major is a new major version; not taken (graft upgrade $name@$major)")
+      held+=("tuteur: $name: $major is a breaking version (new major, or new 0.y); not taken (tuteur upgrade $name@$major)")
     fi
     if [ ${#want[@]} -gt 0 ]; then
       for spec in "${want[@]}"; do
@@ -143,17 +150,17 @@ cmd_upgrade() {
         if [[ $spec == *@* ]]; then target=${spec#*@}; named=1; else target=$latest; named=""; fi
       done
       [ -n "$target" ] || continue
-      # an untagged scion (a fix not yet released) moves only to a named tag, or to the newest of
+      # an untagged pattern (a fix not yet released) moves only to a named tag, or to the newest of
       # the major its nearest release is in
       if [ "$status" = untagged ] && [ "$target" = - ]; then
-        die "$name is at $pinned, not a release tag, and graft can't tell its major: name the tag (graft upgrade $name@TAG)"
+        die "$name is at $pinned, not a release tag, and tuteur can't tell its major: name the tag (tuteur upgrade $name@TAG)"
       fi
     else
       [ "$status" = outdated ] || continue
-      # graft's workflows before 2.3 run graft upgrade and open the PR in one job: moving graft
-      # there would run the new version's code beside the PR token. graft ci sets GRAFT_CI.
-      if [ "$dir" = - ] && [ -n "${CI:-}" ] && [ -z "${GRAFT_CI:-}" ]; then
-        echo "graft: not moving graft itself from a CI job that isn't graft ci (copy graft's template/.forgejo/workflows/ workflows)" >&2
+      # tuteur's workflows before 2.3 run tuteur upgrade and open the PR in one job: moving tuteur
+      # there would run the new version's code beside the PR token. tuteur ci sets TUTEUR_CI.
+      if [ "$dir" = - ] && [ "$name" = "$OWN" ] && [ -n "${CI:-}" ] && [ -z "${TUTEUR_CI:-}${GRAFT_CI:-}" ]; then
+        echo "tuteur: not moving tuteur itself from a CI job that isn't tuteur ci (copy tuteur's template/.forgejo/workflows/ workflows)" >&2
         continue
       fi
       target=$latest
@@ -168,7 +175,7 @@ cmd_upgrade() {
     if [ "$dir" != - ]; then
       path=${PATHS[$name]}
       if [ -e "$path/.git" ]; then
-        # only uncommitted edits stop it: commits on a branch in the scion (a fix) stay on that branch
+        # only uncommitted edits stop it: commits on a branch in the pattern (a fix) stay on that branch
         dirt=$(git -C "$path" status --porcelain --untracked-files=no | head -5 | cut -c4- | paste -sd ' ' -)
         [ -z "$dirt" ] || die "$name: uncommitted edits in $path ($dirt); nothing changed: commit them in the provider, or git -C $path checkout -- ."
       fi
@@ -183,36 +190,45 @@ cmd_upgrade() {
     fi
   done <<<"$rows"
   if [ ${#held[@]} -gt 0 ]; then printf '%s\n' "${held[@]}"; fi
-  [ ${#plan[@]} -gt 0 ] || { echo "graft: nothing to upgrade"; return 0; }
-  # graft's own pin moves first. Fetch that version now: a tag that can't be fetched, or a graft
+  [ ${#plan[@]} -gt 0 ] || { echo "tuteur: nothing to upgrade"; return 0; }
+  # tuteur's own pin moves first. Fetch that version now: a tag that can't be fetched, or a tuteur
   # older than this model, stops here, before any file changes.
   for spec in "${plan[@]}"; do
     IFS=$'\t' read -r name dir pinned target <<<"$spec"
-    [ "$dir" = - ] || continue
-    src=$(graft_src "$target") || exit 1
-    [ -f "$src/lib/refresh.sh" ] || die "graft upgrade moves graft only to v2.13.0 or later (submodule scions); move it by hand"
-    moved_graft="$spec"
+    if [ "$dir" != - ] || [ "$name" != "$OWN" ]; then continue; fi
+    src=$(tuteur_src "$target") || exit 1
+    [ -f "$src/lib/refresh.sh" ] || die "$name $target has no lib/refresh.sh, so tuteur upgrade can't hand it this repository; move it by hand"
+    moved_tuteur="$spec"
   done
-  if [ -n "$moved_graft" ]; then
+  # the inputs, tuteur's own first, then pot: the ref in flake.nix, and the lock re-locked through an empty fetch cache
+  inputs=()
+  [ -z "$moved_tuteur" ] || inputs+=("$moved_tuteur")
+  for spec in "${plan[@]}"; do
+    IFS=$'\t' read -r name dir pinned target <<<"$spec"
+    if [ "$dir" = - ] && [ "$name" != "$OWN" ]; then inputs+=("$spec"); fi
+  done
+  if [ ${#inputs[@]} -gt 0 ]; then
     jq -Rsj . "$FLAKE_NIX" | cmp -s - "$FLAKE_NIX" || die "$FLAKE_NIX isn't valid UTF-8; nothing changed: change the refs by hand"
-    IFS=$'\t' read -r name dir pinned target <<<"$moved_graft"
-    text=$(retarget_text graft "$pinned" "$target" < "$FLAKE_NIX") || exit 1
-    echo "graft: graft $pinned -> $target"
-    printf '%s\n' "$text" > "$FLAKE_NIX"
-    flake_update graft >/dev/null 2>&1 || flake_update graft
   fi
+  for spec in "${inputs[@]}"; do
+    IFS=$'\t' read -r name dir pinned target <<<"$spec"
+    text=$(retarget_text "$name" "$pinned" "$target" < "$FLAKE_NIX") || exit 1
+    echo "tuteur: $name $pinned -> $target"
+    printf '%s\n' "$text" > "$FLAKE_NIX"
+    flake_update "$name" >/dev/null 2>&1 || flake_update "$name"
+  done
   for spec in "${plan[@]}"; do
     IFS=$'\t' read -r name dir pinned target <<<"$spec"
     [ "$dir" != - ] || continue
-    move_scion "$name" "${PATHS[$name]}" "${URLS[$name]}" "$target"
-    echo "graft: $name $pinned -> $target"
+    move_pattern "$name" "${PATHS[$name]}" "${URLS[$name]}" "$target"
+    echo "tuteur: $name $pinned -> $target"
   done
-  # the new graft writes its own README and workflows (its refresh.sh, its template)
-  if [ -n "$moved_graft" ]; then
-    GRAFT_TEMPLATE="" bash "$src/lib/refresh.sh" "$SCIONS" "$FLAKE" "$GRAFT_RUN" "$src/template"
+  # the new tuteur writes its own README and workflows (its refresh.sh, its template)
+  if [ -n "$moved_tuteur" ]; then
+    TUTEUR_TEMPLATE="" bash "$src/lib/refresh.sh" "$PATTERNS" "$FLAKE" "$TUTEUR_RUN" "$src/template"
   fi
-  # the moved scions' recipes (v2.18.0): from the repository's own app, which knows this graft's kits.just
-  [ -z "${GRAFT_IN_REPO:-}" ] || kits_just_write
+  # the moved patterns' recipes (v2.18.0): from the repository's own app, which knows this tuteur's kits.just
+  [ -z "${TUTEUR_IN_REPO:-}" ] || kits_just_write
 }
 
 # What upgrading would bring: for each named input (default: every one outdated reports), the
@@ -225,10 +241,10 @@ cmd_changelog() {
   urls
   for spec in "$@"; do
     want+=("$spec")
-    cut -f1 <<<"$rows" | grep -qxF -- "${spec%%@*}" || die "no scion (or graft input) named ${spec%%@*}"
+    cut -f1 <<<"$rows" | grep -qxF -- "${spec%%@*}" || die "no pattern (or tuteur input) named ${spec%%@*}"
     if [[ $spec == *@* ]]; then is_semver "${spec#*@}" || die "${spec%%@*}: ${spec#*@} is not a version tag"; fi
   done
-  entries=$(mktemp -p "$GRAFT_TMP")
+  entries=$(mktemp -p "$TUTEUR_TMP")
   while IFS=$'\t' read -r name dir pinned latest status major; do
     [ -n "$name" ] || continue
     target=$latest
@@ -247,11 +263,11 @@ cmd_changelog() {
     [ "$status" != unknown ] || unknown=1
     j=null
     if [ "$status" != untagged ] && [ "$status" != unknown ] && newer "$pinned" "$target"; then
-      echo "graft: reading what changed upstream in $name" >&2
+      echo "tuteur: reading what changed upstream in $name" >&2
       if [ "$dir" = - ]; then
         n=$(node "$name"); rev=$(jq -r '.locked.rev // empty' <<<"$n")
       else
-        n=$(scion_node "${URLS[$name]}" "$pinned"); rev=$(gitlink "${PATHS[$name]}")
+        n=$(pattern_node "${URLS[$name]}" "$pinned"); rev=$(gitlink "${PATHS[$name]}")
       fi
       j=$(upstream_range "$name" "$n" "$rev" "" "$pinned" "$target") || exit 1
     fi
@@ -263,7 +279,7 @@ cmd_changelog() {
   if [ "$json" = 1 ]; then
     jq -s . "$entries"
   elif [ ! -s "$entries" ]; then
-    echo "graft: no scions here (no README.md carrying graft's marker), and no graft input"
+    echo "tuteur: no patterns here (no README.md carrying tuteur's marker), and no tuteur input"
   else
     jq -r -s -L "$here" 'include "upstream";
       (if any(.[]; .upstream) then
@@ -275,7 +291,7 @@ cmd_changelog() {
        "\(.name | safe) \(.pinned | safe): " + (
          if .status == "untagged" then "not pinned to a tag; nothing to compare"
          elif .status == "unknown" then "can'"'"'t list its tags upstream (see above); can'"'"'t tell"
-         elif .target == .pinned then "up to date\(if .major then "; \(.major | safe) is a new major (graft changelog \(.name | safe)@\(.major | safe))" else "" end)"
+         elif .target == .pinned then "up to date\(if .major then "; \(.major | safe) is a breaking version (tuteur changelog \(.name | safe)@\(.major | safe))" else "" end)"
          else "\(.target | safe) is not newer; nothing to show" end))' "$entries"
   fi
   [ -z "$unknown" ] || exit 1
@@ -284,14 +300,14 @@ cmd_changelog() {
 sub=${1:-}; shift || true
 usage() {
   case $sub in
-    outdated) echo "usage: graft outdated [-C REPO] [--json]" ;;
-    upgrade) echo "usage: graft upgrade [-C REPO] [NAME[@TAG]...]" ;;
-    changelog) echo "usage: graft changelog [-C REPO] [--json] [NAME[@TAG]...]" ;;
-    *) echo "usage: graft outdated|upgrade|changelog [-C REPO] [--json] [NAME[@TAG]...]" ;;
+    outdated) echo "usage: tuteur outdated [-C REPO] [--json]" ;;
+    upgrade) echo "usage: tuteur upgrade [-C REPO] [NAME[@TAG]...]" ;;
+    changelog) echo "usage: tuteur changelog [-C REPO] [--json] [NAME[@TAG]...]" ;;
+    *) echo "usage: tuteur outdated|upgrade|changelog [-C REPO] [--json] [NAME[@TAG]...]" ;;
   esac
 }
 # an argument this command doesn't take: say which, and how to call it
-bad_arg() { echo "graft: $*" >&2; usage >&2; exit 2; }
+bad_arg() { echo "tuteur: $*" >&2; usage >&2; exit 2; }
 repo="" json=0 args=()
 while [ $# -gt 0 ]; do
   case $1 in
@@ -300,15 +316,15 @@ while [ $# -gt 0 ]; do
     --) shift ;;   # a second `--` after nix run's: nothing to read
     -h|--help) sed -n '2,13p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) bad_arg "unknown option $1" ;;
-    *) [ "$sub" != outdated ] || bad_arg "outdated takes no names: it lists graft and every scion"; args+=("$1"); shift ;;
+    *) [ "$sub" != outdated ] || bad_arg "outdated takes no names: it lists tuteur and every pattern"; args+=("$1"); shift ;;
   esac
 done
 locate "$repo"
-# upgrade moves the scions try reads, and refuses a scion with marked files: one state at a time
-if [ "$sub" = upgrade ] && [ -n "$(try_state)" ]; then die "graft try is on; nothing changed: graft try --stop first"; fi
+# upgrade moves the patterns try reads, and refuses a pattern with marked files: one state at a time
+if [ "$sub" = upgrade ] && [ -n "$(try_state)" ]; then die "tuteur try is on; nothing changed: tuteur try --stop first"; fi
 case $sub in
   outdated) cmd_outdated ;;
   upgrade) cmd_upgrade "${args[@]}" ;;
   changelog) cmd_changelog "${args[@]}" ;;
-  *) die "usage: graft outdated|upgrade|changelog [-C REPO] [--json] [NAME[@TAG]...]" ;;
+  *) die "usage: tuteur outdated|upgrade|changelog [-C REPO] [--json] [NAME[@TAG]...]" ;;
 esac

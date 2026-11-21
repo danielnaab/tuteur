@@ -34,7 +34,7 @@ split($prefix) as $parts
     | swap($rest) as $to | select($to != null)
     | {k: $k, rest: $rest, to: $to} ] as $hits
 | if ($hits | length) != 1 then
-    "graft: \($name): expected its url (\($prefix) at \($old)) once in flake.nix, found it \($hits | length) times; nothing changed: change the ref by hand\n"
+    "tuteur: \($name): expected its url (\($prefix) at \($old)) once in flake.nix, found it \($hits | length) times; nothing changed: change the ref by hand\n"
     | halt_error(1)
   else $hits[0] as $h
     | $parts | .[$h.k] = $h.to + (.[$h.k][$h.rest | length:]) | join($prefix) end

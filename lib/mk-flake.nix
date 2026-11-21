@@ -1,54 +1,54 @@
-# mkFlake: a repo's flake outputs, wired from its scions.
+# mkFlake: a repo's flake outputs, wired from its patterns.
 #
-# A scion is a git submodule in the scions directory (`dir`, beside flake.nix): another repository,
+# A pattern is a git submodule in the patterns folder (`dir`, beside flake.nix): another repository,
 # checked out at a release tag. The gitlink (the commit the repo records) is the pin and .gitmodules
-# the source; flake.lock pins graft alone. Nix reads the scions through `inputs.self.submodules =
+# the source; flake.lock pins tuteur alone. Nix reads the patterns through `inputs.self.submodules =
 # true` (a git flake: Nix fetches each at its gitlink) or from the working tree (a `path:` flake).
 #
-# A scion whose repository has a `graft.nix` at its top is a provider: graft.nix is a function
+# A pattern whose repository has a `tuteur.nix` at its top is a provider: tuteur.nix is a function
 #
-#   { pkgs, lib, system, scion, scions, consumer, ... }:
+#   { pkgs, lib, system, pattern, patterns, consumer, ... }:
 #   { requires ? {}; tools ? {}; apps ? {}; packages ? {}; checks ? {}; kit ? {}; ... }
 #
-# called once per system, with the repo's own `inputs.nixpkgs` (else graft's) as pkgs; scion is this
-# scion alone, copied to the store without its .git file; scions.<name> is every scion (its store
+# called once per system, with the repo's own `inputs.nixpkgs` (else tuteur's) as pkgs; pattern is this
+# pattern alone, copied to the store without its .git file; patterns.<name> is every pattern (its store
 # copy as outPath, merged with that provider's result); consumer is the repo's flake source; and,
-# when the function names it, kitArgs: the consumer's perSystem.kitArgs.<scion> (default { }). The
-# repo's own `perSystem` ({ pkgs, lib, system, scions, ... }: { tools; apps; packages; checks;
+# when the function names it, kitArgs: the consumer's perSystem.kitArgs.<pattern> (default { }). The
+# repo's own `perSystem` ({ pkgs, lib, system, patterns, ... }: { tools; apps; packages; checks;
 # devShells; kit; kitArgs; }) is merged the same way, named `self` in messages. mkFlake merges:
 #
 #   tools      one pkgs.buildEnv, packages.<system>.tools; a name two give is an error, unless both
 #              are the same store path
 #   apps packages
-#              by name; a duplicate is an error, and so are apps.graft, packages.tools,
-#              packages.pot-kits (graft's), and the reserved names sandbox, pot and graft-kits
-#   checks     checks.<system>.<scion>-<name>; perSystem's as checks.<system>.<name>
+#              by name; a duplicate is an error, and so are apps.tuteur, packages.tools,
+#              packages.pot-kits (tuteur's), and the reserved names sandbox, pot and graft-kits
+#   checks     checks.<system>.<pattern>-<name>; perSystem's as checks.<system>.<name>
 #   devShells  perSystem's only; devShells.<system>.default, when none is defined: a shell with the
 #              tools
 #   requires   { name = "url"; }: siblings the provider needs; a missing one is an error naming
-#              `graft add url`
-#   kit        each provider's (a scion kit) and perSystem's (the repo kit), handed unread to pot's
-#              library (pot.lib.kitsFor, contract pot-lib/1) with each one's file, the tools and graft's
-#              CLI for the repo, and what graft has pot protect (every graft.nix, the scions directory):
+#              `tuteur add url`
+#   kit        each provider's (a pattern kit) and perSystem's (the repo kit), handed unread to pot's
+#              library (pot.lib.kitsFor, contract pot-lib/1) with each one's file, the tools and tuteur's
+#              CLI for the repo, and what tuteur has pot protect (every tuteur.nix, the patterns folder):
 #              packages.<system>.pot-kits, which pot builds with path: and reads (contract pot-kits/1).
 #              (v2.15.0's graft-kits went in v2.17.0; its name stays reserved.) graft v2.14.0's `sandbox`
 #              is an error naming `kit`.
 #
-# plus apps.<system>.graft, the graft command (lib/graft.sh). The repo's own `outputs` are merged
-# last (per system, per name), so the repo can add or override; apps.<system>.graft and
-# packages.<system>.pot-kits is graft's, and a repo's own is an error raised by graft's own value; graft-kits,
+# plus apps.<system>.tuteur, the tuteur command (lib/tuteur.sh). The repo's own `outputs` are merged
+# last (per system, per name), so the repo can add or override; apps.<system>.tuteur and
+# packages.<system>.pot-kits is tuteur's, and a repo's own is an error raised by tuteur's own value; graft-kits,
 # sandbox and pot are reserved names in apps and packages.
 #
-# Every check on the scions (the marker README, .gitmodules against what the source holds, names,
+# Every check on the patterns (the marker README, .gitmodules against what the source holds, names,
 # requires, collisions) is an error inside the values it guards, never on an attribute set's names,
 # and the names a provider gives are read so that a failing provider gives none (builtins.tryEval):
-# apps.<system>.graft (`graft sync` fills empty scions) and the repo's own outputs evaluate
-# whatever state the scions are in; pot-kits, like the tools, fails on a failing provider. An
-# empty scion (a path: flake's fresh clone; a private one left uninitialised) fails only what uses
-# it (scions.<name>); the tools leave its own out, with a warning.
+# apps.<system>.tuteur (`tuteur sync` fills empty patterns) and the repo's own outputs evaluate
+# whatever state the patterns are in; pot-kits, like the tools, fails on a failing provider. An
+# empty pattern (a path: flake's fresh clone; a private one left uninitialised) fails only what uses
+# it (patterns.<name>); the tools leave its own out, with a warning.
 { nixpkgs, systems, cli }:
 
-{ inputs, dir ? "scions", perSystem ? null, outputs ? { } }:
+{ inputs, dir ? null, perSystem ? null, outputs ? { } }:
 
 let
   lib = nixpkgs.lib;
@@ -58,18 +58,26 @@ let
   # kits.just; a unit that declares a kit gets one warning
   kitsFor = inputs.pot.lib.pot.kitsFor or null;
   hasPot = kitsFor != null;
-  # the first line of the scions README (lib/graft.sh writes it); also lib/common.sh's MARKER
-  marker = "<!-- managed by graft: https://github.com/danielnaab/graft -->";
+  # the first line of the patterns README (lib/tuteur.sh writes it); also lib/common.sh's MARKER. graft's (graft
+  # v2) is read through 0.1.x: tuteur sync rewrites it
+  marker = "<!-- managed by tuteur: https://github.com/danielnaab/tuteur -->";
+  oldMarker = "<!-- managed by graft: https://github.com/danielnaab/graft -->";
+  marked = t: lib.hasInfix marker t || lib.hasInfix oldMarker t;
+  markedDir = d: let f = "${src}/${d}/README.md"; in builtins.pathExists f && marked (builtins.readFile f);
 
-  validDir = builtins.isString dir && builtins.match "[A-Za-z0-9._-]+" dir != null
-    && dir != "." && dir != ".." && dir != ".git";
+  # the patterns folder: dir, else .patterns; through 0.1.x, with no dir and no .patterns, graft's default
+  # (scions, or .scions) when it holds the marked README (an alias: tuteur check names it)
+  oldDir = lib.findFirst markedDir null (lib.optionals (dir == null && !(builtins.pathExists "${src}/.patterns")) [ "scions" ".scions" ]);
+  folder = if dir != null then dir else if oldDir != null then oldDir else ".patterns";
+  validDir = builtins.isString folder && builtins.match "[A-Za-z0-9._-]+" folder != null
+    && folder != "." && folder != ".." && folder != ".git";
   validName = n: builtins.match "[A-Za-z0-9][A-Za-z0-9._-]*" n != null && n != "self";
-  root = "${src}/${dir}";
+  root = "${src}/${folder}";
   hasRoot = validDir && builtins.pathExists root;
   readme = "${root}/README.md";
   readmeText = if hasRoot && builtins.pathExists readme then builtins.readFile readme else "";
-  hasMarker = lib.hasInfix marker readmeText;
-  # what graft v2.12 and earlier wrote: a table of copied scions
+  hasMarker = marked readmeText;
+  # what graft v2.12 and earlier wrote: a table of copied patterns
   copyMode = hasRoot && (lib.hasInfix "| Scion | Commit |" readmeText || lib.hasInfix "<!-- graft flake: " readmeText);
 
   entries = if hasRoot && !copyMode then builtins.readDir root else { };
@@ -82,15 +90,15 @@ let
   isEmpty = n: lib.elem n empty;
 
   # .gitmodules, when the source holds it (a flake at the repo's top): the submodules registered
-  # in the scions directory, one level down
+  # in the patterns folder, one level down
   gitmodules = "${src}/.gitmodules";
   hasGitmodules = builtins.pathExists gitmodules;
   registered = if !(validDir && hasGitmodules) then [ ] else
     lib.filter (p: p != null) (map (l:
       let m = builtins.match "[[:space:]]*path[[:space:]]*=[[:space:]]*(.*[^[:space:]])[[:space:]]*" l;
           p = if m == null then "" else lib.head m;
-      in if lib.hasPrefix "${dir}/" p && !(lib.hasInfix "/" (lib.removePrefix "${dir}/" p))
-         then lib.removePrefix "${dir}/" p else null)
+      in if lib.hasPrefix "${folder}/" p && !(lib.hasInfix "/" (lib.removePrefix "${folder}/" p))
+         then lib.removePrefix "${folder}/" p else null)
       (lib.splitString "\n" (builtins.readFile gitmodules)));
   absent = lib.sort lib.lessThan (lib.filter (n: !(lib.elem n dirs)) registered);
   # a folder that isn't a submodule: not registered (at the top), or (in a subdirectory flake, whose
@@ -98,53 +106,62 @@ let
   unregistered = if hasGitmodules then lib.filter (n: !(lib.elem n registered)) names
     else lib.filter (n: !(isEmpty n) && !((contents n) ? ".git")) names;
 
-  # folders at the top of the flake's source holding graft's README: one that isn't dir means dir is wrong
-  markerDirs = if !validDir then [ ] else lib.filter (d:
-      let f = "${src}/${d}/README.md"; in builtins.pathExists f && lib.hasInfix marker (builtins.readFile f))
+  # folders at the top of the flake's source holding tuteur's README: one that isn't dir means dir is wrong
+  markerDirs = if !validDir then [ ] else lib.filter markedDir
     (lib.attrNames (lib.filterAttrs (_: t: t == "directory") (builtins.readDir src)));
-  wrongDir = markerDirs != [ ] && !(lib.elem dir markerDirs);
+  wrongDir = markerDirs != [ ] && !(lib.elem folder markerDirs);
 
-  paths = ns: lib.concatMapStringsSep ", " (n: "${dir}/${n}") ns;
+  paths = ns: lib.concatMapStringsSep ", " (n: "${folder}/${n}") ns;
   github = ". Fetched with github:? use git+https://…, which keeps submodules.";
   problems =
-    if !validDir then [ "graft: mkFlake's dir must be one folder name (letters, digits, . _ -; not ., .. or .git), got \"${toString dir}\"" ]
-    else if copyMode then [ "graft: ${dir}/README.md is graft's copy-mode README (v2.12 or earlier): graft v2.13.0 pins scions with git submodules; follow the Upgrading steps of v2.13.0 in graft's CHANGELOG.md" ]
-    else if wrongDir then [ "graft: graft's README is in ${lib.head markerDirs}/ but mkFlake's dir is \"${dir}\": set dir = \"${lib.head markerDirs}\"; (or move the scions)" ]
+    if !validDir then [ "tuteur: mkFlake's dir must be one folder name (letters, digits, . _ -; not ., .. or .git), got \"${toString folder}\"" ]
+    else if copyMode then [ "tuteur: ${folder}/README.md is graft's copy-mode README (v2.12 or earlier): graft v2.13.0 pins scions with git submodules; follow the Upgrading steps of v2.13.0 in graft's CHANGELOG.md" ]
+    else if wrongDir then [ "tuteur: tuteur's README is in ${lib.head markerDirs}/ but mkFlake's dir is \"${folder}\": set dir = \"${lib.head markerDirs}\"; (or move the patterns)" ]
     else lib.optional (hasRoot && !hasMarker)
-        "graft: ${dir}/README.md lacks graft's marker: is dir right? (mkFlake's dir = \"${dir}\")"
+        "tuteur: ${folder}/README.md lacks tuteur's marker: is dir right? (mkFlake's dir = \"${folder}\")"
       ++ lib.optional (absent != [ ])
-        "graft: .gitmodules registers ${paths absent} but the flake's source lacks ${if lib.length absent == 1 then "it" else "them"}: add inputs.self.submodules = true; to flake.nix (Nix >= 2.27)${github}"
-      ++ map (n: "graft: ${dir}/${n} is not a submodule: graft add URL, or remove it") unregistered
-      ++ map (n: "graft: ${dir}/${n}: a scion's folder name must be letters, digits, . _ and - (starting with a letter or digit), and not self") badNames;
-  # every value that reads the scions goes through this
+        "tuteur: .gitmodules registers ${paths absent} but the flake's source lacks ${if lib.length absent == 1 then "it" else "them"}: add inputs.self.submodules = true; to flake.nix (Nix >= 2.27)${github}"
+      ++ map (n: "tuteur: ${folder}/${n} is not a submodule: tuteur add URL, or remove it") unregistered
+      ++ map (n: "tuteur: ${folder}/${n}: a pattern's folder name must be letters, digits, . _ and - (starting with a letter or digit), and not self") badNames;
+  # every value that reads the patterns goes through this
   ok = x: if problems == [ ] then x else throw (lib.concatStringsSep "\n" problems);
-  emptyMsg = ns: why: "graft: ${paths ns} ${if lib.length ns == 1 then "is" else "are"} empty in the flake's source${why}: run git submodule update --init --recursive (or graft sync)${lib.optionalString hasGitmodules github}";
+  emptyMsg = ns: why: "tuteur: ${paths ns} ${if lib.length ns == 1 then "is" else "are"} empty in the flake's source${why}: run git submodule update --init --recursive (or tuteur sync)${lib.optionalString hasGitmodules github}";
 
-  providers = lib.filter (n: !(isEmpty n) && builtins.pathExists "${root}/${n}/graft.nix") names;
+  # a provider's file: tuteur.nix, else graft.nix (graft v2's name, read through 0.1.x: tuteur check names it)
+  providerFile = n: if builtins.pathExists "${root}/${n}/tuteur.nix" then "tuteur.nix"
+    else if builtins.pathExists "${root}/${n}/graft.nix" then "graft.nix" else null;
+  providers = lib.filter (n: !(isEmpty n) && providerFile n != null) names;
+  fileOf = n: "${folder}/${n}/${providerFile n}";
   # the units merged: each provider, then the repo's own perSystem as `self`
   units = providers ++ lib.optional (perSystem != null) "self";
-  # each scion alone, without its .git file: a tool built from it doesn't change when the repo
-  # does (interpolating "${src}/${dir}/x" would make every repo commit a new tool)
+  # each pattern alone, without its .git file: a tool built from it doesn't change when the repo
+  # does (interpolating "${src}/${folder}/x" would make every repo commit a new tool)
   copies = lib.genAttrs names (n: builtins.path {
     path = "${root}/${n}";
-    name = "scion-${n}";
+    name = "pattern-${n}";
     filter = p: _: baseNameOf p != ".git";
   });
 
   forSystem = system:
     let
       pkgs = (inputs.nixpkgs or nixpkgs).legacyPackages.${system};
-      args = { inherit pkgs system; lib = pkgs.lib; scions = siblings; };
+      args = { inherit pkgs system; lib = pkgs.lib; };
+      # the names a function is called with: pattern and patterns, and graft's scion and scions (provider/2, read
+      # through 0.1.x); a function that names only one pair gets only that pair, so one with no `...` still works
+      named = f: one: let fa = builtins.functionArgs f;
+          old = fa ? scion || fa ? scions; new = fa ? pattern || fa ? patterns; in
+        lib.optionalAttrs (old || !new) ({ scions = siblings; } // lib.optionalAttrs (one != null) { scion = one; })
+        // lib.optionalAttrs (new || !old) ({ patterns = siblings; } // lib.optionalAttrs (one != null) { pattern = one; });
       # an error inside a provider names it
       ctx = n: x: if n == "self" then x
-        else builtins.addErrorContext "while evaluating ${dir}/${n}/graft.nix (graft calls it for the scion ${n})" x;
-      # kitArgs: the consumer's perSystem.kitArgs.<scion>, for a provider whose function names it
+        else builtins.addErrorContext "while evaluating ${fileOf n} (tuteur calls it for the pattern ${n})" x;
+      # kitArgs: the consumer's perSystem.kitArgs.<pattern>, for a provider whose function names it
       kitArgsOf = n: (raw.self.kitArgs or { }).${n} or { };
       raw = lib.genAttrs providers (n: ctx n (
-        let f = import "${copies.${n}}/graft.nix"; in
-        f (args // { scion = copies.${n}; consumer = inputs.self; }
+        let f = import "${copies.${n}}/${providerFile n}"; in
+        f (args // named f copies.${n} // { consumer = inputs.self; }
           // lib.optionalAttrs ((builtins.functionArgs f) ? kitArgs) { kitArgs = kitArgsOf n; })))
-        // lib.optionalAttrs (perSystem != null) { self = perSystem args; };
+        // lib.optionalAttrs (perSystem != null) { self = perSystem (args // named perSystem null); };
       # a provider's result, its requires asserted before anything else of it is used
       results = lib.mapAttrs (n: r:
         let
@@ -152,7 +169,7 @@ let
           missing = lib.filter (m: !(lib.elem m names)) (lib.attrNames req);
         in
         if missing == [ ] then r else throw (lib.concatMapStringsSep "\n" (m:
-          "graft: ${n} needs ${m}, which this repository does not graft: graft add ${toString req.${m}}") missing))
+          "tuteur: ${n} needs ${m}, which this repository does not have: tuteur add ${toString req.${m}}") missing))
         raw;
       siblings = lib.genAttrs names (n:
         if isEmpty n then throw (emptyMsg [ n ] "")
@@ -160,7 +177,7 @@ let
 
       # the names a unit gives for KIND, read from its raw result: a provider that fails fails them,
       # loudly (never dropped). keysOf, for apps and packages alone, gives none instead, so that
-      # apps.graft (the repair path) and the repo's own outputs still evaluate; the tools and the
+      # apps.tuteur (the repair path) and the repo's own outputs still evaluate; the tools and the
       # checks read every provider with keysStrict, so a failing one fails them, naming it
       keysStrict = n: kind: ctx n (lib.attrNames (raw.${n}.${kind} or { }));
       keysOf = n: kind:
@@ -169,7 +186,7 @@ let
       # KIND's names from every unit, each with the units that give it
       gather = keys: kind: lib.foldl' (acc: n:
         acc // lib.genAttrs (keys n kind) (k: (acc.${k} or [ ]) ++ [ n ])) { } units;
-      who = n: if n == "self" then "the consumer's perSystem" else "scion ${n}";
+      who = n: if n == "self" then "the consumer's perSystem" else "pattern ${n}";
       merge = keys: kind: lib.mapAttrs (k: from:
         let
           v = n: ctx n results.${n}.${kind}.${k};
@@ -178,36 +195,48 @@ let
         in
         if lib.length from > 1 && !same
         then throw (if lib.elem "self" from
-          then "graft: ${kind} ${k} (from ${lib.concatMapStringsSep " and " who from}): both provide the same name; rename the consumer's own"
-          else "graft: ${kind} ${k} (from ${lib.concatStringsSep " and " from}): two scions provide the same name")
+          then "tuteur: ${kind} ${k} (from ${lib.concatMapStringsSep " and " who from}): both provide the same name; rename the consumer's own"
+          else "tuteur: ${kind} ${k} (from ${lib.concatStringsSep " and " from}): two patterns provide the same name")
         else ok (v (lib.head from))) (gather keys kind);
 
       tools = merge keysStrict "tools";
-      # graft's own names, taken by a unit: raised by the tools, which every repo builds
-      taken = kind: k: map (n: "graft: ${kind} ${k} (from ${n}): that name is graft's; ${if n == "self" then "rename the repo's own" else "the provider must rename it"}")
+      # tuteur's own names, taken by a unit: raised by the tools, which every repo builds
+      taken = kind: k: map (n: "tuteur: ${kind} ${k} (from ${n}): that name is tuteur's; ${if n == "self" then "rename the repo's own" else "the provider must rename it"}")
         (lib.filter (n: lib.elem k (keysOf n kind)) units);
-      reserved = taken "apps" "graft" ++ taken "packages" "tools"
+      reserved = taken "apps" "tuteur" ++ taken "apps" "graft" ++ taken "packages" "tools"
         ++ lib.concatMap (k: taken "apps" k ++ taken "packages" k) [ "sandbox" "pot" "pot-kits" "graft-kits" ];
       warnEmpty = x: if empty == [ ] then x
         else lib.warn (emptyMsg empty ", so the tools leave out what ${if lib.length empty == 1 then "it gives" else "they give"}") x;
       toolsUnwrapped = ok (if reserved != [ ] then throw (lib.concatStringsSep "\n" reserved)
-        else warnEmpty (pkgs.buildEnv { name = "tools"; paths = lib.attrValues tools; }));
+        else warnEmpty (pkgs.buildEnv { name = "tools"; paths = lib.attrValues tools; passthru = { inherit tuteurAliases; }; }));
+      # graft's names in use that 0.1.x still reads, for tuteur check's lines (lib/patterns.sh aliases_in_use)
+      argNames = f: lib.filter (a: (builtins.functionArgs f) ? ${a}) [ "scion" "scions" ];
+      tuteurAliases = lib.optional (oldDir != null) {
+          thing = "the folder ${folder}/, which mkFlake finds without dir,";
+          todo = "keep it with dir = \"${folder}\"; in mkFlake, or move it to .patterns/ (0.2.0's Upgrading steps)"; }
+        ++ map (n: { thing = fileOf n; todo = "the provider ships tuteur.nix (ask its maintainers; it can ship both meanwhile)"; })
+          (lib.filter (n: providerFile n == "graft.nix") providers)
+        ++ lib.concatMap (n: let f = if n == "self" then perSystem else import "${copies.${n}}/${providerFile n}"; a = argNames f; in
+          lib.optional (a != [ ]) {
+            thing = "${if lib.length a > 1 then "each of scion and scions" else lib.head a}, in ${if n == "self" then "the consumer's perSystem" else fileOf n}'s arguments,";
+            todo = "name ${if lib.length a > 1 then "them pattern and patterns" else "it ${if a == [ "scion" ] then "pattern" else "patterns"}"}"; })
+          (lib.filter (n: n == "self" || builtins.isFunction (import "${copies.${n}}/${providerFile n}")) units);
       # v2.18.0 (D4): each kit command's wrapper over the tool of the same name, so pot runs kit code under its
       # own policy; passthru.unwrapped is the tools as before, for Nix consumers and a worker that runs no pot
       toolsEnv = if !hasPot then warnKits toolsUnwrapped else ok (builtins.seq toolsUnwrapped.drvPath pkgs.buildEnv {
         name = "tools";
         paths = lib.attrValues tools ++ [ (lib.hiPrio potKits.wrappers) ];
-        passthru.unwrapped = toolsUnwrapped;
+        passthru = { unwrapped = toolsUnwrapped; inherit tuteurAliases; };
       });
       # the kits, for pot: the repo kit (perSystem's `kit`) and each provider's, handed to pot's
       # library unread. v2.14.0's `sandbox` is an error that names its replacement
       kitOf = n: let r = results.${n}; in
-        if r ? sandbox then throw "graft: ${if n == "self" then "the consumer's perSystem" else "${dir}/${n}/graft.nix"} gives `sandbox`: graft v2.15.0 replaced it with `kit` (pot; see graft's CHANGELOG)"
+        if r ? sandbox then throw "tuteur: ${if n == "self" then "the consumer's perSystem" else fileOf n} gives `sandbox`: graft v2.15.0 replaced it with `kit` (pot; see graft's CHANGELOG)"
         else r.kit or null;
-      kitFile = n: if n == "self" then "flake.nix (perSystem)" else "${dir}/${n}/graft.nix";
+      kitFile = n: if n == "self" then "flake.nix (perSystem)" else fileOf n;
       kitUnits = lib.filterAttrs (_: v: v != null) (lib.genAttrs units (n:
         let k = ctx n (kitOf n); in if k == null then null else { kit = k; file = kitFile n; }));
-      graftForRepo = cli pkgs { GRAFT_DIR = dir; GRAFT_IN_REPO = "1"; };
+      tuteurForRepo = cli pkgs { TUTEUR_DIR = folder; TUTEUR_IN_REPO = "1"; };
       # no inputs.pot: the kits go nowhere, said once (on the tools, which every repo builds)
       warnKits = x: if kitUnits == { } then x
         else lib.warn ("tuteur: ${lib.concatMapStringsSep ", " kitFile (lib.attrNames kitUnits)} declare${lib.optionalString (lib.length (lib.attrNames kitUnits) == 1) "s"} a kit for pot, "
@@ -217,14 +246,14 @@ let
         inherit pkgs;
         self = kitUnits.self or null;
         scions = removeAttrs kitUnits [ "self" ];
-        tools = lib.attrValues tools ++ [ graftForRepo ];
-        # graft's own files: every provider's graft.nix and the scions directory are read-only in a run
-        files = [ "**/tuteur.nix" "**/gr@ft.nix" dir ];
-        # graft's own recipes, in the same kits.just as the kits' (v2.18.0)
+        tools = lib.attrValues tools ++ [ tuteurForRepo ];
+        # tuteur's own files: every provider's tuteur.nix and the patterns folder are read-only in a run
+        files = [ "**/tuteur.nix" "**/graft.nix" folder ];
+        # tuteur's own recipes, in the same kits.just as the kits' (v2.18.0)
         recipes = {
-          outdated = { run = "graft outdated"; description = "Show the pinned and newest tag of each scion"; };
-          upgrade = { run = "graft upgrade"; description = "Move scions to newer release tags (NAME, or NAME@TAG)"; };
-          graft-check = { run = "graft check"; description = "Check that every scion is clean and at a release tag"; };
+          outdated = { run = "tuteur outdated"; description = "Show the pinned and newest tag of each pattern"; };
+          upgrade = { run = "tuteur upgrade"; description = "Move patterns to newer release tags (NAME, or NAME@TAG)"; };
+          tuteur-check = { run = "tuteur check"; description = "Check that every pattern is clean and at a release tag"; };
         };
       });
       devShells = lib.mapAttrs (_: ok) (results.self.devShells or { });
@@ -232,11 +261,11 @@ let
     in
     {
       # packages' names by keysOf too: `nix build .#NAME` and `nix eval` look in packages.<system>
-      # first, so its names must evaluate for the repo's own outputs (and apps.graft) to; the tools
+      # first, so its names must evaluate for the repo's own outputs (and apps.tuteur) to; the tools
       # (strict) fail on the provider instead
       packages = removeAttrs (merge keysOf "packages") [ "tools" "pot-kits" "graft-kits" "sandbox" "pot" ]
         // { tools = toolsEnv; } // lib.optionalAttrs hasPot { pot-kits = potKits; };
-      apps = removeAttrs (merge keysOf "apps") [ "graft" "sandbox" "pot" "pot-kits" "graft-kits" ];
+      apps = removeAttrs (merge keysOf "apps") [ "tuteur" "graft" "sandbox" "pot" "pot-kits" "graft-kits" ];
       checks = lib.foldl' (acc: n:
         acc // lib.listToAttrs (map (k: lib.nameValuePair (if n == "self" then k else "${n}-${k}")
           (ok (ctx n results.${n}.checks.${k}))) (keysStrict n "checks"))) { } units;
@@ -246,33 +275,39 @@ let
     };
 
   bySystem = lib.genAttrs systems forSystem;
-  graftOut = lib.genAttrs [ "packages" "apps" "checks" "devShells" ]
+  tuteurOut = lib.genAttrs [ "packages" "apps" "checks" "devShells" ]
     (kind: lib.mapAttrs (_: o: o.${kind}) bySystem);
 
   # the repo's own last, per system and name (a derivation is replaced whole, never merged into)
   merged = lib.recursiveUpdateUntil
-    (path: l: r: lib.length path >= 3 || !(builtins.isAttrs l && builtins.isAttrs r)) graftOut outputs;
+    (path: l: r: lib.length path >= 3 || !(builtins.isAttrs l && builtins.isAttrs r)) tuteurOut outputs;
 
-  # graft's own outputs: the repo's own `outputs` may not replace them; sandbox and pot are reserved
+  # tuteur's own outputs: the repo's own `outputs` may not replace them; sandbox and pot are reserved
   own = system: kind: k: v: if outputs ? ${kind}.${system}.${k}
-    then throw "graft: mkFlake's outputs has ${kind}.${system}.${k}: that name is graft's; rename the repo's own"
+    then throw "tuteur: mkFlake's outputs has ${kind}.${system}.${k}: that name is tuteur's; rename the repo's own"
     else v;
-  reservedOut = lib.concatMap (kind: lib.concatMap (s: map (k: "graft: mkFlake's outputs has ${kind}.${s}.${k}: that name is reserved (pot); rename the repo's own")
+  reservedOut = lib.concatMap (kind: lib.concatMap (s: map (k: "tuteur: mkFlake's outputs has ${kind}.${s}.${k}: that name is reserved (pot); rename the repo's own")
     (lib.filter (k: lib.elem k [ "sandbox" "pot" ]) (lib.attrNames (outputs.${kind}.${s} or { }))))
     (lib.attrNames (outputs.${kind} or { }))) [ "apps" "packages" ];
   noReserved = v: if reservedOut == [ ] then v else throw (lib.concatStringsSep "\n" reservedOut);
-  graftApps = system:
+  tuteurApps = system:
     let pkgs = nixpkgs.legacyPackages.${system}; in
     lib.mapAttrs (own system "apps") {
+      tuteur = {
+        type = "app";
+        program = lib.getExe (cli pkgs { TUTEUR_DIR = folder; TUTEUR_IN_REPO = "1"; });
+        meta.description = "tuteur: add, sync, check, outdated, upgrade, changelog, migrate, ci";
+      };
+      # graft's name, for the workflows and recipes that run nix run .#graft: through 0.1.x (tuteur check names it)
       graft = {
         type = "app";
-        program = lib.getExe (cli pkgs { GRAFT_DIR = dir; GRAFT_IN_REPO = "1"; });
-        meta.description = "graft: add, sync, check, outdated, upgrade, changelog, migrate, ci";
+        program = lib.getExe (cli pkgs { TUTEUR_DIR = folder; TUTEUR_IN_REPO = "1"; TUTEUR_VIA = "graft"; });
+        meta.description = "tuteur, by graft's name (0.2.0 drops it): nix run .#tuteur";
       };
     };
 in
 merged // {
-  apps = (merged.apps or { }) // lib.genAttrs systems (s: lib.mapAttrs (_: noReserved) (merged.apps.${s} or { }) // graftApps s);
+  apps = (merged.apps or { }) // lib.genAttrs systems (s: lib.mapAttrs (_: noReserved) (merged.apps.${s} or { }) // tuteurApps s);
   packages = (merged.packages or { }) // lib.genAttrs systems (s: lib.mapAttrs (_: noReserved) (merged.packages.${s} or { })
     // lib.optionalAttrs (hasPot || outputs ? packages.${s}.pot-kits) {
       pot-kits = own s "packages" "pot-kits" (bySystem.${s}.packages.pot-kits or null);

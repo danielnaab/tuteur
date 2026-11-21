@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 # migrate.sh [-C REPO] [--base REF] [--no-check] [--json]: a migration brief for a branch where an
-# upgrade is already applied (the bot's graft/upgrade, say): what moved, what upstream says about
+# upgrade is already applied (the bot's tuteur/upgrade, say): what moved, what upstream says about
 # it, what in this repo refers to what moved, and what `nix flake check` says broke. Printed for an
-# agent or a person to act on; graft never runs an agent itself.
-#   nix run .#graft migrate | claude -p        (or: workmux add x -p "$(nix run .#graft migrate)")
+# agent or a person to act on; tuteur never runs an agent itself.
+#   nix run .#tuteur migrate | claude -p        (or: workmux add x -p "$(nix run .#tuteur migrate)")
 #
 # The base is the merge-base of HEAD with REF (default: origin/HEAD, else origin/main,
 # origin/master, main, master). Moved inputs come from flake.lock at the base against the working
-# tree's; the scions diff is the base against the working tree, uncommitted changes and new files
+# tree's; the patterns diff is the base against the working tree, uncommitted changes and new files
 # included (staged in a copy of the index, so the repo's own index is never touched).
 #
 # Sections, each also a field of --json: the header (repo, branch, what moved, the rules);
 # `upstream` (each moved provider's CHANGELOG.md sections between the two tags, Upgrading
-# subsections first, or its commits: fetched with plain git as graft ci pr does, quoted as the
-# provider's text); `changes` (the scions diff, renames and deletions first); `references` (lines
-# of the repo's own files, outside graft's directories and workflows, that name a renamed or
-# deleted scion path); `checks` (each of checks.<system> by name, then `nix flake check`, unless
-# --no-check). Run as `nix run .#graft migrate` this is the branch's own graft, from its evaluated
-# flake; run from graft's flake (`nix run github:danielnaab/graft/vX.Y.Z -- migrate -C .`) with
+# subsections first, or its commits: fetched with plain git as tuteur ci pr does, quoted as the
+# provider's text); `changes` (the patterns diff, renames and deletions first); `references` (lines
+# of the repo's own files, outside tuteur's directories and workflows, that name a renamed or
+# deleted pattern path); `checks` (each of checks.<system> by name, then `nix flake check`, unless
+# --no-check). Run as `nix run .#tuteur migrate` this is the branch's own tuteur, from its evaluated
+# flake; run from tuteur's flake (`nix run github:danielnaab/tuteur/vX.Y.Z -- migrate -C .`) with
 # --no-check, nothing of the branch's is evaluated or run: its files are only read.
 #
 # Exit 0 whenever a brief is printed, failing checks or not: it's a report. Nonzero only when it
@@ -37,7 +37,7 @@ while [ $# -gt 0 ]; do
     --no-check) check=0; shift ;;
     --json) json=1; shift ;;
     -h|--help) sed -n '2,6p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) die "usage: graft migrate [-C REPO] [--base REF] [--no-check] [--json]" ;;
+    *) die "usage: tuteur migrate [-C REPO] [--base REF] [--no-check] [--json]" ;;
   esac
 done
 locate "$repo"
@@ -58,7 +58,7 @@ fi
 git rev-parse -q --verify --end-of-options "$base_ref^{commit}" >/dev/null 2>&1 || die "--base $base_ref: not a commit"
 base=$(git merge-base --end-of-options "$base_ref" HEAD) || die "$base_ref and HEAD have no common ancestor"
 
-tmp=$GRAFT_TMP/migrate
+tmp=$TUTEUR_TMP/migrate
 mkdir -p "$tmp"
 empty_lock='{"nodes":{"root":{"inputs":{}}}}'
 git show "$base:$FLAKE_LOCK" > "$tmp/base.lock" 2>/dev/null || echo "$empty_lock" > "$tmp/base.lock"
@@ -70,9 +70,9 @@ else
   echo "$empty_lock" > "$tmp/head.lock"
 fi
 
-# graft's directory and workflows here
+# tuteur's directory and workflows here
 dirs=() pathspec=()
-if [ -n "$SCIONS" ]; then dirs=("$SCIONS"); pathspec=(":(literal)$SCIONS"); fi
+if [ -n "$PATTERNS" ]; then dirs=("$PATTERNS"); pathspec=(":(literal)$PATTERNS"); fi
 workflows=()
 for f in .forgejo/workflows/*; do
   if [ -f "$f" ] && [ ! -L "$f" ] && grep -q "^$WORKFLOW_MARKER" "$f"; then workflows+=("$f"); fi
@@ -86,38 +86,40 @@ label() {
   if is_semver "$ref"; then echo "$ref"; elif [ -n "$ref" ]; then echo "$ref at $rev"; else echo "$rev"; fi
 }
 
-# moved lock inputs: graft's with what upstream says, any other just named
+# moved lock inputs: tuteur's own (tuteur, else graft) and pot with what upstream says, any other just named
 : > "$tmp/moved"; : > "$tmp/other"
+own=$(own_input "$tmp/head.lock"); [ -n "$own" ] || own=$(own_input "$tmp/base.lock")
 while IFS= read -r n; do
   o=$(lock_node "$tmp/base.lock" "$n"); nw=$(lock_node "$tmp/head.lock" "$n")
   ov=$(jq -r '.locked.rev // .locked.narHash // empty' <<<"${o:-null}")
   nv=$(jq -r '.locked.rev // .locked.narHash // empty' <<<"${nw:-null}")
   [ "$ov" != "$nv" ] || continue
-  if [ "$n" != graft ]; then
+  if [ "$n" = "$own" ]; then kind=tuteur; elif [ "$n" = pot ]; then kind=pot; else kind=""; fi
+  if [ -z "$kind" ]; then
     jq -n --arg name "$n" --arg from "$([ -n "$o" ] && label "$o")" --arg to "$([ -n "$nw" ] && label "$nw")" \
       '{name: $name, kind: "other", status: "moved", from: $from, to: $to}' >> "$tmp/other"
   elif [ -z "$o" ] || [ -z "$nw" ]; then
-    jq -n --arg s "$([ -z "$o" ] && echo added || echo removed)" --arg from "$([ -n "$o" ] && label "$o")" \
-      --arg to "$([ -n "$nw" ] && label "$nw")" '{name: "graft", kind: "graft", status: $s, from: $from, to: $to}' >> "$tmp/moved"
+    jq -n --arg name "$n" --arg kind "$kind" --arg s "$([ -z "$o" ] && echo added || echo removed)" --arg from "$([ -n "$o" ] && label "$o")" \
+      --arg to "$([ -n "$nw" ] && label "$nw")" '{name: $name, kind: $kind, status: $s, from: $from, to: $to}' >> "$tmp/moved"
   else
-    echo "graft: reading what changed upstream in graft" >&2
-    j=$(upstream_input "$tmp/base.lock" "$tmp/head.lock" graft)
-    [ -n "$j" ] || j=$(jq -n --arg from "$(label "$o")" --arg to "$(label "$nw")" \
-      '{name: "graft", from: $from, to: $to, status: "not-commit"}')
-    jq -c '. + {kind: "graft"}' <<<"$j" >> "$tmp/moved"
+    echo "tuteur: reading what changed upstream in $n" >&2
+    j=$(upstream_input "$tmp/base.lock" "$tmp/head.lock" "$n")
+    [ -n "$j" ] || j=$(jq -n --arg name "$n" --arg from "$(label "$o")" --arg to "$(label "$nw")" \
+      '{name: $name, from: $from, to: $to, status: "not-commit"}')
+    jq -c --arg kind "$kind" '. + {kind: $kind}' <<<"$j" >> "$tmp/moved"
   fi
 done < <(jq -r -s '[.[].nodes.root.inputs | to_entries[] | select(.value|type=="string") | .key] | unique[]' "$tmp/base.lock" "$tmp/head.lock")
 
-# moved scions: each gitlink at the base against the scion now (its checkout, else the index), with
+# moved patterns: each gitlink at the base against the pattern now (its checkout, else the index), with
 # what upstream says and what changed in its tree
 : > "$tmp/changes"; : > "$tmp/gone"
-if [ -n "$SCIONS" ]; then
+if [ -n "$PATTERNS" ]; then
   git show "$base:.gitmodules" > "$tmp/base.gitmodules" 2>/dev/null || : > "$tmp/base.gitmodules"
   declare -A surl=()
-  while IFS=$'\t' read -r name path url; do [ -z "$name" ] || surl[$name]=$url; done < <(scions_registered "$tmp/base.gitmodules")
-  while IFS=$'\t' read -r name path url; do [ -z "$name" ] || surl[$name]=$url; done < <(scions_registered .gitmodules)
+  while IFS=$'\t' read -r name path url; do [ -z "$name" ] || surl[$name]=$url; done < <(patterns_registered "$tmp/base.gitmodules")
+  while IFS=$'\t' read -r name path url; do [ -z "$name" ] || surl[$name]=$url; done < <(patterns_registered .gitmodules)
   for name in $(printf '%s\n' "${!surl[@]}" | LC_ALL=C sort); do
-    path=$SCIONS/$name url=${surl[$name]}
+    path=$PATTERNS/$name url=${surl[$name]}
     ov=$(gitlink "$path" "$base")
     nv=$(gitlink "$path")
     if [ -n "$nv" ] && [ -e "$path/.git" ]; then nv=$(git -C "$path" rev-parse -q --verify HEAD 2>/dev/null) || nv=$(gitlink "$path"); fi
@@ -128,13 +130,13 @@ if [ -n "$SCIONS" ]; then
     if [ -z "$ov" ] || [ -z "$nv" ]; then
       jq -n -c --arg name "$name" --arg s "$([ -z "$ov" ] && echo added || echo removed)" \
         --arg from "${ot:-${ov:0:12}}" --arg to "${nt:-${nv:0:12}}" \
-        '{name: $name, kind: "scion", status: $s, from: $from, to: $to}' >> "$tmp/moved"
+        '{name: $name, kind: "pattern", status: $s, from: $from, to: $to}' >> "$tmp/moved"
       continue
     fi
-    echo "graft: reading what changed upstream in $name" >&2
-    j=$(upstream_range "$name" "$(scion_node "$url" "$ot")" "$ov" "$nv" "$ot" "$nt")
-    jq -c '. + {kind: "scion"}' <<<"$j" >> "$tmp/moved"
-    # the tree's changes: in the scion's own clone when it has both commits, else a bare fetch
+    echo "tuteur: reading what changed upstream in $name" >&2
+    j=$(upstream_range "$name" "$(pattern_node "$url" "$ot")" "$ov" "$nv" "$ot" "$nt")
+    jq -c '. + {kind: "pattern"}' <<<"$j" >> "$tmp/moved"
+    # the tree's changes: in the pattern's own clone when it has both commits, else a bare fetch
     r=$path
     if ! { [ -e "$path/.git" ] && git -C "$path" cat-file -e "$ov^{commit}" 2>/dev/null && git -C "$path" cat-file -e "$nv^{commit}" 2>/dev/null; }; then
       r=$tmp/repo-$name
@@ -142,7 +144,7 @@ if [ -n "$SCIONS" ]; then
       git -C "$r" -c http.extraHeader= fetch -q --no-tags -- "$url" "$ov" "$nv" 2>/dev/null \
         || git -C "$r" -c http.extraHeader= fetch -q -- "$url" 'refs/tags/*:refs/tags/*' 2>/dev/null || true
       if ! git -C "$r" cat-file -e "$ov^{commit}" 2>/dev/null || ! git -C "$r" cat-file -e "$nv^{commit}" 2>/dev/null; then
-        echo "graft: can't fetch $name's commits from $url: its changes are left out" >&2
+        echo "tuteur: can't fetch $name's commits from $url: its changes are left out" >&2
         continue
       fi
     fi
@@ -168,9 +170,9 @@ if [ -n "$SCIONS" ]; then
   done
 fi
 
-# references: lines of the repo's own files naming a renamed or deleted scion path (or a directory
-# of one that's gone), the way a file outside the scions directory has to: through its last segment
-# ("scions/name/a.md", "../scions/name/a.md", "/scions/name/a.md"), spaces raw or as %20
+# references: lines of the repo's own files naming a renamed or deleted pattern path (or a directory
+# of one that's gone), the way a file outside the patterns folder has to: through its last segment
+# ("patterns/name/a.md", "../patterns/name/a.md", "/patterns/name/a.md"), spaces raw or as %20
 : > "$tmp/refs"
 refs_error=""
 declare -A target=()
@@ -180,12 +182,12 @@ if [ -s "$tmp/gone" ]; then
     target[$1]=$2
     if [[ $1 == *" "* ]]; then target[${1// /%20}]=$2; fi
   }
-  d=$SCIONS
+  d=$PATTERNS
   while IFS=$'\t' read -r -d '' p how to r nv; do
     [[ $p == "$d"/* ]] || continue
     add_key "${d##*/}/${p#"$d"/}" "$(jq -n -c --arg t "$p" --arg h "$how" --arg to "$to" \
       '{target: $t, status: $h, to: (if $to == "" then null else $to end)}')"
-    sp=${p#"$d"/}; sp=${sp#*/}   # the path inside the scion
+    sp=${p#"$d"/}; sp=${sp#*/}   # the path inside the pattern
     a=${sp%/*}
     while [ "$a" != "$sp" ] && [ -n "$a" ] && [ -z "${seen[$p:$a]:-}" ]; do
       seen[$p:$a]=1
@@ -213,7 +215,7 @@ if [ -s "$tmp/gone" ]; then
       git grep -z -n -o -I -P --untracked -f "$tmp/pattern" -- . "${excl[@]}" >> "$tmp/hits" 2>"$tmp/grep.err" || rc=$?
       if [ "$rc" -gt 1 ]; then
         refs_error=$(head -c 200 "$tmp/grep.err" | head -1)
-        echo "graft: couldn't search the repo for references: $refs_error" >&2
+        echo "tuteur: couldn't search the repo for references: $refs_error" >&2
         break
       fi
     done
@@ -232,7 +234,7 @@ if [ ! -s "$tmp/moved" ] && [ ! -s "$tmp/changes" ]; then nothing=1; fi
 # checks: unless --no-check (and there's something to check)
 echo null > "$tmp/checks"
 if [ "$check" = 1 ] && [ "$nothing" = 0 ]; then
-  echo "graft: running the repo's checks (their logs follow; the brief goes to stdout)" >&2
+  echo "tuteur: running the repo's checks (their logs follow; the brief goes to stdout)" >&2
   if full_check "$tmp/report" >&2; then
     echo '{"ran": true, "passed": true, "failed": [], "log": ""}' > "$tmp/checks"
   else
@@ -258,8 +260,8 @@ fi
 branch=$(git branch --show-current)
 applied=committed
 if [ -n "$(git --no-optional-locks status --porcelain --untracked-files=no -- "$FLAKE_NIX" "$FLAKE_LOCK" "${pathspec[@]}")" ]; then applied=uncommitted; fi
-# whether flake.nix moved too (a ref graft upgrade changed): the brief names it with the lock. Only
-# a changed line with an input's url counts (graft upgrade writes the tag there), so an edit of the
+# whether flake.nix moved too (a ref tuteur upgrade changed): the brief names it with the lock. Only
+# a changed line with an input's url counts (tuteur upgrade writes the tag there), so an edit of the
 # repo's own outputs doesn't; one to a url line by hand does, and is a pin too.
 nix_moved=false
 if grep -qE '^[-+][^-+].*url' <<<"$(git diff "$base" -- "$FLAKE_NIX" 2>/dev/null)"; then nix_moved=true; fi
@@ -272,11 +274,11 @@ jq -n --arg repo "$name" --arg branch "$branch" --arg head "$(git rev-parse --sh
      flake: (if $flake == "." then null else $flake end), flake_nix_moved: $nix_moved,
      base: {ref: $base_ref, commit: $base}, applied: $applied, nothing_moved: $nothing,
      references_error: (if $refs_error == "" then null else $refs_error end),
-     scion_dirs: $ARGS.positional}' "${dirs[@]}" > "$tmp/top"
+     pattern_dirs: $ARGS.positional}' "${dirs[@]}" > "$tmp/top"
 jq -n --args '$ARGS.positional' "${workflows[@]}" > "$tmp/workflows"
 jq -s --slurpfile top "$tmp/top" --slurpfile wf "$tmp/workflows" --slurpfile checks "$tmp/checks" \
   --slurpfile other "$tmp/other" --slurpfile changes "$tmp/changes" --slurpfile refs "$tmp/refs" \
-  '$top[0] + {graft_workflows: $wf[0], moved: ., also_moved: $other, changes: $changes,
+  '$top[0] + {tuteur_workflows: $wf[0], moved: ., also_moved: $other, changes: $changes,
              references: $refs, checks: $checks[0]}' "$tmp/moved" > "$tmp/brief.json"
 
 if [ "$json" = 1 ]; then jq . "$tmp/brief.json"; else jq -r -L "$here" -f "$here/migrate.jq" "$tmp/brief.json"; fi

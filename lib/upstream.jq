@@ -1,5 +1,5 @@
 # upstream.jq: jq definitions shared through `include "upstream";` (jq -L lib): the text helpers,
-# and one input's upstream notes (common.sh's upstream_range JSON) as graft migrate and graft
+# and one input's upstream notes (common.sh's upstream_range JSON) as tuteur migrate and tuteur
 # changelog print them. Provider text leaves only as a block quote.
 
 def cap(n): if length <= n then . else (.[0:n+1] | sub("\n[^\n]*$"; ""))
