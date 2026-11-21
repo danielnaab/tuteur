@@ -8,11 +8,11 @@ require it before a merge.
 
 ## Before you begin
 
-- The repository grafts the pattern, and `nix flake check` passes ([Graft your first pattern](graft-a-repository.md)).
-  The example grafts `page-rules`, a provider with one rule (each page in `docs/` gives its status in front
-  matter) and a checker. Its `graft.nix` contributes a check, `pages`, that runs the checker on your `docs/`.
+- The repository adds the pattern, and `nix flake check` passes ([Add your first pattern](add-a-pattern.md)).
+  The example adds `page-rules`, a provider with one rule (each page in `docs/` gives its status in front
+  matter) and a checker. Its `tuteur.nix` contributes a check, `pages`, that runs the checker on your `docs/`.
 - CI must be able to fetch the provider. For a private provider, see
-  [Graft a private repository](private-providers.md).
+  [Add a private provider](private-providers.md).
 - `flake.nix` is at the repository's top. A flake in a subdirectory sees only that directory, so a provider's
   check there cannot read your pages: see [A flake in a subdirectory](#a-flake-in-a-subdirectory).
 
@@ -28,7 +28,7 @@ require it before a merge.
    [ "page-rules-pages" ]
    ```
 
-   Each is named `SCION-CHECK`. Use your machine's system for `x86_64-linux`. If a provider has no check, its
+   Each is named `PATTERN-CHECK`. Use your machine's system for `x86_64-linux`. If a provider has no check, its
    README says how to run its tool; add a check of your own ([A check of your own](#a-check-of-your-own)).
 
 2. If the provider reads a settings file, write it. Its README names the file and its fields. A check skips,
@@ -105,20 +105,20 @@ require it before a merge.
            run: nix flake check
    ```
 
-   It uses the runner label of graft's workflows
-   ([Run graft in CI and review its upgrade pull requests](ci.md)). Like `graft-check.yaml`, it cancels a run
+   It uses the runner label of tuteur's workflows
+   ([Run tuteur in CI and review its upgrade pull requests](ci.md)). Like `tuteur-check.yaml`, it cancels a run
    when a newer push to the same branch starts one. Change `main` to your default branch.
 
-   graft's `graft-check.yaml` stays as it is: it checks that the scions are clean and at release tags. Your
-   checks are a status of their own, from this workflow, which you own. graft never changes a workflow that does
+   tuteur's `tuteur-check.yaml` stays as it is: it checks that the patterns are clean and at release tags. Your
+   checks are a status of their own, from this workflow, which you own. tuteur never changes a workflow that does
    not carry its marker line.
 
-   Give this workflow no secrets. On graft's upgrade pull request, `nix flake check` runs the new graft
+   Give this workflow no secrets. On tuteur's upgrade pull request, `nix flake check` runs the new tuteur
    version and the new provider's checker before anyone has reviewed them ([CI security](../ci-security.md)).
 
    On GitHub, write `.github/workflows/flake-check.yaml` with the same `name:`, triggers and job key, and
    these steps: `uses: actions/checkout@v7`, `uses: cachix/install-nix-action@v31` (Nix 2.27 or later), then
-   `run: nix flake check`. A top-level git flake does not need `submodules: recursive`: Nix fetches the scions.
+   `run: nix flake check`. A top-level git flake does not need `submodules: recursive`: Nix fetches the patterns.
 
 7. On a new branch, commit:
 
@@ -146,8 +146,8 @@ require it before a merge.
    On GitHub, add a branch rule with **Require status checks to pass before merging**, and add the job,
    `flake-check`.
 
-   The rule also holds graft's weekly upgrade pull request until a person starts the check on it: Forgejo
-   starts no workflow for what a job token did, and graft's upgrade job pushes with one. See
+   The rule also holds tuteur's weekly upgrade pull request until a person starts the check on it: Forgejo
+   starts no workflow for what a job token did, and tuteur's upgrade job pushes with one. See
    [If something goes wrong](#if-something-goes-wrong).
 
 10. Test the gate in the forge. On a new branch from the default branch, add a page with no front matter,
@@ -182,15 +182,15 @@ curl -fsS -H "Authorization: token $FORGEJO_TOKEN" "https://forgejo.example/api/
   only committed pages, so the gate still holds.
 - **The check names no page, and passes, though a page breaks the rule.** The provider's check reads a
   settings file that is absent, and skips. Write it (step 2).
-- **graft's upgrade pull request says `Some required checks are missing.`** No workflow ran on its newest
-  commit. graft's upgrade job pushes `graft/upgrade` with the job token, and Forgejo starts no workflow for
-  that push. Your workflow runs only when graft opens the pull request with `GRAFT_PR_TOKEN`, a user's
-  token. It does not run when graft opens the pull request with the job token, or when a later week's
+- **tuteur's upgrade pull request says `Some required checks are missing.`** No workflow ran on its newest
+  commit. tuteur's upgrade job pushes `tuteur/upgrade` with the job token, and Forgejo starts no workflow for
+  that push. Your workflow runs only when tuteur opens the pull request with `TUTEUR_PR_TOKEN`, a user's
+  token. It does not run when tuteur opens the pull request with the job token, or when a later week's
   upgrade updates it. The upgrade job has already run your whole `nix flake check` on the branch: if it
   failed, the title starts `[checks failing]`. To get the status, close the pull request and reopen it:
   that starts the workflow as you.
 
-  Not yet: graft's upgrade job does not report its `nix flake check` as a status on the commit.
+  Not yet: tuteur's upgrade job does not report its `nix flake check` as a status on the commit.
 - **Another pull request says `Some required checks are missing.`** No status matches the pattern of
   step 9. Compare the pattern with the names in the pull request's checks: a changed workflow `name:` or
   job key changes the status name. A workflow that skips the pull request (`paths-ignore`, say) sends no
@@ -198,24 +198,24 @@ curl -fsS -H "Authorization: token $FORGEJO_TOKEN" "https://forgejo.example/api/
 
 ## How it works
 
-- **Where the check comes from.** The provider's `graft.nix` returns `checks.pages`, a Nix build that reads
+- **Where the check comes from.** The provider's `tuteur.nix` returns `checks.pages`, a Nix build that reads
   your repository through `consumer`. mkFlake adds it as `checks.<system>.page-rules-pages`. It uses the tools the
-  provider names, at the versions that the scion's commit pins, so CI uses the same checker as you. It is part
-  of `nix flake check`, which graft's weekly upgrade also runs, so a new version of the pattern is tested on
+  provider names, at the versions that the pattern's commit pins, so CI uses the same checker as you. It is part
+  of `nix flake check`, which tuteur's weekly upgrade also runs, so a new version of the pattern is tested on
   your pages before you merge it.
 - **Which pages it sees.** A git flake's source is what is committed, plus uncommitted edits to tracked files.
   CI checks only committed pages, so the gate holds.
 
 ### A check of your own
 
-When a provider ships a tool but no check, write one with `mkFlake`'s `perSystem`. Its `scions` argument has
+When a provider ships a tool but no check, write one with `mkFlake`'s `perSystem`. Its `patterns` argument has
 each provider's tools:
 
 ```nix
-outputs = { self, ... }@inputs: inputs.graft.lib.mkFlake {
+outputs = { self, ... }@inputs: inputs.tuteur.lib.mkFlake {
   inherit inputs;
-  perSystem = { pkgs, scions, ... }: {
-    checks.pages = pkgs.runCommand "pages" { nativeBuildInputs = [ scions.page-rules.tools.pagecheck ]; } ''
+  perSystem = { pkgs, patterns, ... }: {
+    checks.pages = pkgs.runCommand "pages" { nativeBuildInputs = [ patterns.page-rules.tools.pagecheck ]; } ''
       cd ${self}
       pagecheck docs
       touch $out
@@ -236,19 +236,19 @@ git submodule update --init --recursive
 nix shell 'path:nix/agent-tools#tools' -c pagecheck docs
 ```
 
-Keep `graft-check.yaml` beside it: it runs graft's check.
+Keep `tuteur-check.yaml` beside it: it runs tuteur's check.
 
 ## Sources
 
-- [lib/mk-flake.nix](../../lib/mk-flake.nix): prefixed checks from each `graft.nix`, `consumer`, `perSystem`, and the merge of a
+- [lib/mk-flake.nix](../../lib/mk-flake.nix): prefixed checks from each `tuteur.nix`, `consumer`, `perSystem`, and the merge of a
   repository's own `outputs` (`lib.recursiveUpdate`).
 - [lib/ci.sh](../../lib/ci.sh): `check`, which evaluates `tools` but builds no check; `upgrade`, which runs the
   whole `nix flake check` and pushes; `pr`, which titles a failing upgrade.
-- [template/.forgejo/workflows/](../../template/.forgejo/workflows/): `graft-check.yaml`, whose runner label
-  and checkout step 6 copies, and `graft-upgrade.yaml`, which pushes with the job token and opens the pull
-  request with `GRAFT_PR_TOKEN`.
+- [template/.forgejo/workflows/](../../template/.forgejo/workflows/): `tuteur-check.yaml`, whose runner label
+  and checkout step 6 copies, and `tuteur-upgrade.yaml`, which pushes with the job token and opens the pull
+  request with `TUTEUR_PR_TOKEN`.
 - [tests/run.sh](../../tests/run.sh): the `gate:` checks, a provider check reading a settings file from `consumer`,
-  and a consumer's own `outputs` overriding graft's.
+  and a consumer's own `outputs` overriding tuteur's.
 - [tests/fixtures.sh](../../tests/fixtures.sh) `gate-merges`: the repositories this page was read against.
 - Forgejo's source, read but not run against a forge for this page: the status name
   ([services/actions/commit_status.go](https://codeberg.org/forgejo/forgejo/src/branch/forgejo/services/actions/commit_status.go)),

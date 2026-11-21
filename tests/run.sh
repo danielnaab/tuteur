@@ -1574,6 +1574,7 @@ EOF
   expect "the old name is gone" test ! -e .forgejo/workflows/graft-check.yaml
   expect "the new marker" grep -q "^# managed by tuteur: " .forgejo/workflows/tuteur-check.yaml
   expect "the ssh line in tuteur's form" grep -qxF "# tuteur ssh: host=[git.example.com]:2222 hostkey=$key" .forgejo/workflows/tuteur-check.yaml
+  # shellcheck disable=SC2016 # the workflow's own expression
   expect "its secret: TUTEUR_SSH_KEY, else GRAFT_SSH_KEY" grep -qF 'TUTEUR_SSH_KEY: ${{ secrets.TUTEUR_SSH_KEY || secrets.GRAFT_SSH_KEY }}' .forgejo/workflows/tuteur-check.yaml
   commit sync
   ran "aliases: check after sync" nix run .#tuteur -- check
@@ -1636,6 +1637,7 @@ EOF
   # step 1: flake.nix's URLs (the input keeps the name graft), and pot, which this consumer's kits need; then lock
   sed -i "s|  inputs.graft.url = \"git+file://$gv?ref=v2.22.0\";|  inputs.graft.url = \"git+file://$tv?ref=v0.1.0\";\n  inputs.pot.url = \"path:$pot\";|" flake.nix
   ran "fromgraft: step 1, lock" env XDG_CACHE_HOME="$work/xdg-fg" nix flake update graft
+  # shellcheck disable=SC2016 # a just recipe's own text
   expect "graft's input is tuteur 0.1.0" quiet jq -e --arg r "$(git_ -C "$tv" rev-parse v0.1.0)" '.nodes.graft.locked.rev == $r' flake.lock
   # step 2: sync, by graft's name for the app: tuteur 0.1.0, through the alias
   ran "fromgraft: step 2, nix run .#graft sync" nix run .#graft sync

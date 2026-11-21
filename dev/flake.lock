@@ -36,8 +36,8 @@
     "pot": {
       "flake": false,
       "locked": {
-        "lastModified": 1795296575,
-        "narHash": "sha256-SVCWiIRNHhBEgYhd17g3OOhQFQ7WTZ9p0J/V+kDo0Jk=",
+        "lastModified": 1795297894,
+        "narHash": "sha256-LlbJUv9HXNsMcZf67k3AguJJue0K+XKsRItGB/R+Ppc=",
         "path": "/home/daniel/src/pot",
         "type": "path"
       },

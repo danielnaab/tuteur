@@ -1,5 +1,69 @@
 # Changelog
 
+## v0.1.0 - 2026-11-21
+
+graft is now **tuteur** (say "too-TUR"), in a new repository, `danielnaab/tuteur`, whose versions start again
+at 0.1.0; and **pot**, its sandbox, is a repository of its own, `danielnaab/pot`. tuteur depends on nothing of
+pot's. graft's history is below, up to v2.22.0; graft's repository keeps its tags, archived, so every graft pin
+still fetches. Below 1.0, each `0.y` series is a breaking version: the weekly upgrade takes 0.1.x patches by itself
+and holds 0.2.0 for a person.
+
+- **The names.** The command, app and messages are `tuteur`. What graft called a scion is a **pattern**; the
+  default folder is `.patterns/`; a provider's file is `tuteur.nix`, whose function gets `pattern` and `patterns`
+  ([provider/3](docs/reference/provider.md)); the workflows are `tuteur-check.yaml`, `tuteur-upgrade.yaml` and
+  `tuteur-signers.yaml`, with the branch `tuteur/upgrade` and the secret `TUTEUR_PR_TOKEN`
+  ([Concepts: graft's words](docs/concepts.md#grafts-words)).
+- **graft's names, read through 0.1.x.** The input name `graft` (read through 0.x: tuteur's own pin is the input
+  `tuteur`, else `graft`); the app `graft`; `scions/` or `.scions/` as the folder when `mkFlake` has no `dir` and
+  `.patterns/` doesn't exist; graft's marker README; a provider's `graft.nix` beside `tuteur.nix`, and the
+  arguments `scion` and `scions`; marked `graft-*.yaml` workflows and the `# graft ssh:` line, which `sync`
+  renames and rewrites; `secrets.GRAFT_PR_TOKEN` and `GRAFT_SSH_KEY` after the new secrets; `add --scions`;
+  `.graft-try`, on which `check` fails as on its own; `GRAFT_SIGNERS_*`. `tuteur check` prints one line for each
+  in use, `tuteur: <thing> is graft's name; 0.2.0 drops it: <what to do>`, and does not fail on it.
+- **pot leaves.** `pot/`, its flake outputs (`lib.mkRoot`, `lib.pot.kitsFor`, `kits`, `apis`,
+  `homeManagerModules.pot`, `packages.pot`, `apps.pot`), its checks, tests and docs are pot's repository's. tuteur
+  re-exports none of them: each old name is an error that names pot's flake.
+- **mkFlake calls pot only through the consumer's `inputs.pot`.** With it, mkFlake calls
+  `inputs.pot.lib.pot.kitsFor` (pot-lib/1) as before: `pot-kits`, wrapped tools, `kits.just`. Without it, there is
+  no `pot-kits`, the tools are not wrapped, `sync` writes no `kits.just` (and `check` fails on one that is there),
+  and a unit that declares a kit gets one warning. pot protects `**/tuteur.nix`, `**/graft.nix` and the folder.
+  `pot-kits` stays a reserved name, as do `graft-kits`, `sandbox` and `pot` (through 0.1.x)
+  ([Declare kit commands](docs/guides/kit-commands.md)).
+- **`upgrade` and `outdated` also move a consumer's input named `pot`** at a version tag, by the same rule
+  (patches only below 1.0), through `flake.nix` and `flake.lock` alone; only tuteur's own input runs the new
+  version's `lib/refresh.sh`. `ci pr` and `migrate` quote pot's CHANGELOG with tuteur's
+  ([outdated](docs/reference/commands.md#outdated)).
+- **"Breaking", not "major".** `outdated`'s column is `BREAKING`; `upgrade` says `X is a breaking version (new
+  major, or new 0.y); not taken (tuteur upgrade NAME@X)`, and `ci upgrade`'s summary and `ci pr`'s "Not taken"
+  list read that line. `outdated --json` keeps the field `major`, and status/1 keeps graft's field names
+  (`scions_dir`, `graft`, `scions`): fields are interfaces.
+- **Tests:** the `0.y` series for a pattern, tuteur's own pin and `pot` (`v0.1.0`, `v0.1.1`, `v0.2.0`: `upgrade`
+  takes v0.1.1, holds v0.2.0, and `NAME@v0.2.0` crosses); the `kits` section is mkFlake's half of the seam, with pot
+  as `dev/flake.nix`'s test input; `aliases`; and `fromgraft`, a consumer of graft v2.22.0 moved by the steps
+  below, checked, then rolled back.
+- **The version-crossing interface** `lib/refresh.sh PATTERNS FLAKE RUN TEMPLATE`, which an older version's
+  `upgrade` runs of the version it moves to, is written down ([Development](docs/development.md#the-version-crossing-interface)).
+- **Scope** no longer includes a sandbox policy ([Decisions](docs/decisions.md#scope-nix-git-submodules-and-a-tag-comparison)).
+
+### Upgrading
+
+From graft v2.22.0, a person's pull request in each consumer
+([Move from graft v2](docs/guides/move-from-graft.md)); the weekly job can't make it (the URL changes):
+
+1. In `flake.nix`, keep the input's name and change its URL: `inputs.graft.url =
+   "github:danielnaab/tuteur/v0.1.0";`. If agents or kit commands run under pot there, add
+   `inputs.pot.url = "github:danielnaab/pot/v0.1.0";` (a root moves to pot first). Lock:
+   `XDG_CACHE_HOME=$(mktemp -d) nix flake update graft`.
+2. `nix run .#graft sync` (tuteur 0.1.0, through the alias): it rewrites the marker README, renames graft's marked
+   workflows to `tuteur-*.yaml`, and rewrites `kits.just`.
+3. `nix run .#tuteur check` and `nix flake check`. Under pot, `pot explain` lists the same kits; expect one
+   `pot grant` for the repo kit, because `flake.lock` changed.
+4. On the forge: add `TUTEUR_PR_TOKEN` (or rely on `GRAFT_PR_TOKEN`); edit any branch rule that names
+   `graft-check / …`; close the open `graft/upgrade` pull request, and delete that branch after the merge.
+5. Open the pull request, review it, merge.
+
+Keep the folder as it is: tuteur 0.2.0 moves it to `.patterns/`, in its own Upgrading steps.
+
 ## v2.22.0 - 2026-11-21
 
 The next minor release, v2.22.0: graft's and pot's contracts that grove reads are enforceable, each as prose, a JSON
@@ -9,29 +73,29 @@ Schema (2020-12) and golden fixtures owned by its producer.
   each scion, the pinned commit, the tag it is at, whether it is registered, filled and clean, the newest release of
   its major and a later major, and `graft check`'s messages for it, in one read of each upstream's tags. It changes
   nothing and evaluates nothing, and exits 0 whatever the scions' state (`graft check` is the gate). `--json` prints
-  [status/1](contracts/status-1.md): a value that needs the network and cannot be read is `null` with a `reason`.
-  Its [schema](contracts/status-1.schema.json) and [fixtures](contracts/fixtures/status-1/) are in `contracts/`;
-  `tests/run.sh status` validates every report graft writes against it ([status](docs/reference/commands.md#status)).
-- **runs/1's schema and fixtures.** [runs-1.schema.json](pot/contracts/runs-1.schema.json) (`pot runs --json`, one
-  record, `pot review --json`) and [runs-1.event.schema.json](pot/contracts/runs-1.event.schema.json) (one line of a
-  run's `log.jsonl`), with four runs' logs and records in [fixtures/runs-1/](pot/contracts/fixtures/runs-1/) for
+  [status/1](https://github.com/danielnaab/graft/blob/v2.22.0/contracts/status-1.md): a value that needs the network and cannot be read is `null` with a `reason`.
+  Its [schema](https://github.com/danielnaab/graft/blob/v2.22.0/contracts/status-1.schema.json) and [fixtures](https://github.com/danielnaab/graft/blob/v2.22.0/contracts/fixtures/status-1/) are in `contracts/`;
+  `tests/run.sh status` validates every report graft writes against it ([status](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/commands.md#status)).
+- **runs/1's schema and fixtures.** [runs-1.schema.json](https://github.com/danielnaab/graft/blob/v2.22.0/pot/contracts/runs-1.schema.json) (`pot runs --json`, one
+  record, `pot review --json`) and [runs-1.event.schema.json](https://github.com/danielnaab/graft/blob/v2.22.0/pot/contracts/runs-1.event.schema.json) (one line of a
+  run's `log.jsonl`), with four runs' logs and records in [fixtures/runs-1/](https://github.com/danielnaab/graft/blob/v2.22.0/pot/contracts/fixtures/runs-1/) for
   readers. `tests/run.sh contracts` checks that each fixture record is what pot computes from its log, and the
   `pot`, `dispatch`, `sibling` and `pi` sections validate every log line and record their runs wrote
-  ([runs/1](pot/contracts/runs-1.md#schema-and-fixtures)). The contract itself is unchanged.
+  ([runs/1](https://github.com/danielnaab/graft/blob/v2.22.0/pot/contracts/runs-1.md#schema-and-fixtures)). The contract itself is unchanged.
 - **A contract is prose, a JSON Schema and golden fixtures, owned by its producer**, which tests that what it emits
-  validates; readers test against the fixtures ([pot's contracts](pot/contracts/README.md)).
+  validates; readers test against the fixtures ([pot's contracts](https://github.com/danielnaab/graft/blob/v2.22.0/pot/contracts/README.md)).
 - **The fetch-cache guard.** Three NAR hash mismatches (2026-11-14, -19 and -20) came from a lock written through
   a Nix fetch cache that a `git+file:` fetch had filled with the commit's whole tree, export-ignored files included
-  ([A polluted fetch cache](docs/reference/nix-behaviours.md#a-polluted-fetch-cache-locks-the-wrong-tree)).
+  ([A polluted fetch cache](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/nix-behaviours.md#a-polluted-fetch-cache-locks-the-wrong-tree)).
   - `graft upgrade` fetches graft's new tag and re-locks it (`nix flake update graft`) through an empty fetch cache
-    of its own, without the global flake registry ([upgrade](docs/reference/commands.md#upgrade)). graft's own
+    of its own, without the global flake registry ([upgrade](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/commands.md#upgrade)). graft's own
     release and its `dev/` input bump now run with an empty `XDG_CACHE_HOME`
-    ([Release](docs/development.md#release)).
+    ([Release](https://github.com/danielnaab/graft/blob/v2.22.0/docs/development.md#release)).
   - `graft check` compares the `narHash` of each pin at a version tag in the flake's `flake.lock` (graft's own, and
     any `github:` or `git` input at a tag) with the NAR hash of its tag's `git archive`, and fails on a mismatch,
     naming the fetch cache and the re-lock: `XDG_CACHE_HOME=$(mktemp -d) nix flake update NAME`. A pin it cannot
-    fetch gets a note ([check](docs/reference/commands.md#check),
-    [`graft check` fails](docs/guides/check-fails.md)).
+    fetch gets a note ([check](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/commands.md#check),
+    [`graft check` fails](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/check-fails.md)).
 - `graft check`, `outdated`, `changelog` and `upgrade` list an upstream that cannot be read once per run, not once
   per use.
 
@@ -44,17 +108,17 @@ commits name their run, and a report-only CI check says who signed what reached 
   commits it left on the checkout's `HEAD` with their signatures (`%G?` and the signer's principal), on stderr and
   in the run's log: an `after` event, and `commits` in a `pot host` run's runs/1 record. Its start event now records
   `mode` `none` and the pid, as the contract said. `^C` is the command's: pot no longer dies with it and takes the
-  command down ([host](docs/reference/pot.md#host)).
+  command down ([host](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/pot.md#host)).
 - **pot trailer.** A new verb, git's `prepare-commit-msg` hook: with `POT_RUN` set, it adds `Pot-Run: <id>` to the
   message, once. A message written in an editor, and an empty one, are left alone, and it never fails a commit. A
   run's generated `~/.gitconfig` wires it, and every run sets `POT_RUN` (run-env/1); on the host, wire it in your
-  git config. `trailer` is now a verb, so no context may take the name ([trailer](docs/reference/pot.md#trailer)).
+  git config. `trailer` is now a verb, so no context may take the name ([trailer](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/pot.md#trailer)).
 - **graft ci signers and graft-signers.yaml.** A new managed workflow and step, report-only: each push to the
   default branch and each tag is checked against the repository's `.forgejo/allowed_signers` as it was before the
   push. Principals name a class (`daniel@person`, `daniel@routine`, `agent@HOST`): an agent's commit needs a
   `Pot-Run:` trailer, a change to grants, the signers file or agent instructions needs a `@person` key, and a tag
   is annotated and signed by `@person` or `@routine`. Copy the workflow in to use it
-  ([ci signers](docs/reference/commands.md#ci), [Report who signed each commit](docs/guides/ci.md#report-who-signed-each-commit)).
+  ([ci signers](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/commands.md#ci), [Report who signed each commit](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/ci.md#report-who-signed-each-commit)).
 - graft's package puts `openssh` on its `PATH` (`ssh-keygen`, for the signer check).
 
 ## v2.20.2 - 2026-11-20
@@ -65,7 +129,7 @@ commits name their run, and a report-only CI check says who signed what reached 
   SIGTERM, then SIGKILL, to 80-130 of the user's processes (`neagent`, so Tailscale's tunnel; `rapportd`, `secd`,
   `tccd`, `trustd` …). A process is now the run's only when its profile reads `policy.json` and not the `launch.json`
   beside it, which only the run's own profile does, and never when it started before the run
-  ([On macOS](docs/reference/pot.md#on-macos)).
+  ([On macOS](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/pot.md#on-macos)).
 - **pot doctor names its own version.** v2.20.1's said `pot v2.20.0`; a test now holds it to this file's latest.
 
 ## v2.20.1 - 2026-11-19
@@ -76,14 +140,14 @@ commits name their run, and a report-only CI check says who signed what reached 
   with the backend's cleanup, on both backends, once its backend has ended (a pot killed alone leaves its backend
   running until the command ends; a lost run whose sockets still answer is left alone). A lost run that had logged
   its exit is cleaned up too; a clone-mode run that still needs its after event keeps getting it from its recovery
-  ([Protected paths](docs/reference/pot.md#protected-paths)).
+  ([Protected paths](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/pot.md#protected-paths)).
 
 ## v2.20.0 - 2026-11-19
 
 pot: siblings, not nesting. One trust rule for every backend (Daniel's decisions 11-22): every kit command runs only
 under its own grant, never with a caller's authority. Design, review list and residuals:
-[siblings, not nesting](docs/reference/pot-siblings.md). Moving from v2.19.x:
-[Move to v2.20.0](docs/guides/move-to-v2-20.md).
+[siblings, not nesting](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/pot-siblings.md). Moving from v2.19.x:
+[Move to v2.20.0](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/move-to-v2-20.md).
 
 - **pot: a kit command inside a run is a sibling.** A wrapped command whose policy is narrower than the run's is no
   longer nested in it: the run's broker (new, host-side) starts it beside the run, on the host, under the command's
@@ -91,7 +155,7 @@ under its own grant, never with a caller's authority. Design, review list and re
   its terminal (`SCM_RIGHTS`; pipes and files through a pipe of its own), blocks, and gets the exit code; `^C` reaches the sibling; the sibling stops
   when its caller goes (killed, a tool timeout) or the run ends. At most 16 run at once in a run's tree, and 8
   deep. On macOS too: `git commit` inside `pot claude` now runs a wrapped pre-commit hook, where v2.19.x refused
-  (`Seatbelt cannot nest`) ([Siblings and the children table](docs/reference/pot.md#siblings-and-the-children-table)).
+  (`Seatbelt cannot nest`) ([Siblings and the children table](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/pot.md#siblings-and-the-children-table)).
 - **pot: a kit command never gets the context's standing reach** (its `include`d kits, such as a personal kit's
   `git.fetch`), on the host or inside a run: its own kit's grant and the repo kit's reach only. No grant asks again.
 - **pot: a wrapper with no row in the run's children table is refused** (exit 126: `… not in this run's children
@@ -135,7 +199,7 @@ From the Mac checks of v2.19.1 (Seatbelt, which platform-vm cannot run). Both fi
   a run on a Mac could create or rewrite `.Envrc`, the file host direnv opens as `.envrc`, with no warning, and an
   existing `.Envrc` or `FLAKE.NIX` was not pinned read-only. Now it is pinned, and a new one is flagged at exit and
   in review, as `.envrc` is. On every system, so on a case-sensitive one this only protects more
-  ([Protected paths](docs/reference/pot.md#protected-paths)).
+  ([Protected paths](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/pot.md#protected-paths)).
 - **pot runs:** two runs that start in the same second list in the order they started (their `policy.json`'s time
   breaks the tie), so `pot runs`' first is the newest. Two tests that took it flaked.
 - tests/run.sh's Seatbelt section tests F4 for real: it grants `fixedtest` and makes its folders itself (they were
@@ -148,7 +212,7 @@ From the Mac checks of v2.19.1 (Seatbelt, which platform-vm cannot run). Both fi
   (`mkdir settings.json.lock`), which the protected, read-only `.pi` refused, so pi ignored the project's settings
   and the skills they name (`Warning: Invalid settings file …: EROFS`). A protected folder that the root's new
   `sealedProtect` names (default `[ "**/.pi" ]`) is now sealed under bubblewrap: each entry stays read-only, and a
-  new entry is the run's alone, gone at exit and never on the host ([Protected paths](docs/reference/pot.md#protected-paths)).
+  new entry is the run's alone, gone at exit and never on the host ([Protected paths](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/pot.md#protected-paths)).
   In place, with read access, in `inspect` and in a nested child (a dispatch clone proposes instead, below).
 - **macOS:** Seatbelt cannot seal, so there `.pi` stays plainly read-only and pi still ignores a project's
   `.pi/settings.json`.
@@ -157,7 +221,7 @@ From the Mac checks of v2.19.1 (Seatbelt, which platform-vm cannot run). Both fi
   What the run commits there is flagged by the host's own look: `agent config: PATH` in `pot review`,
   `changes agent configuration: PATH (loads in agent sessions once merged)` in `pot review RUN`, `--fetch` and the
   exit line, and runs/1's `clone.agentConfig`; nested children's clones too. In place nothing changes
-  ([Change agent configuration from a run](docs/guides/dispatch.md#change-agent-configuration-from-a-run)).
+  ([Change agent configuration from a run](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/dispatch.md#change-agent-configuration-from-a-run)).
 - **Sealed folders, reported:** a seal's new entries land in the run's state, and what the run left there is listed
   at exit (`pot: the run created .pi/extensions/x.ts (2 B) in a sealed folder; it was discarded …`), then removed. A
   folder of more than 256 entries stays plainly read-only, with a start note; a hidden one stays hidden.
@@ -173,7 +237,7 @@ From the Mac checks of v2.19.1 (Seatbelt, which platform-vm cannot run). Both fi
 ## v2.19.0 - 2026-11-19
 
 - **pot: the `pi` kit.** `graft.kits.pi { pkgs; providers; settings; endpoints; files; … }` runs the pi coding
-  agent in pot, named `pi` in a root (or `pi@NAME` for several) ([pot's reference: pi](docs/reference/pot.md#pi)).
+  agent in pot, named `pi` in a root (or `pi@NAME` for several) ([pot's reference: pi](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/pot.md#pi)).
   - Its reach is computed from the providers: each `baseUrl` (provider and model) and endpoint is a `network`
     request, each `"${NAME}"` key a `credential` for its host, and nothing else. A provider on the host's loopback,
     one with no `baseUrl`, or a command key (`"!…"`) fails evaluation, naming it.
@@ -187,7 +251,7 @@ From the Mac checks of v2.19.1 (Seatbelt, which platform-vm cannot run). Both fi
   now resolves each host once and refuses it when an address is loopback or unspecified, granted or not, so the
   host's own name and a name that rebinds to `127.0.0.1` are refused like `127.0.0.1`; it connects to the checked
   address. Before, a granted loopback host, or a name that resolved there, was reached. The refusal is its own
-  denial, with no fix ([Messages](docs/reference/pot.md#messages)). A root that granted a loopback host loses it:
+  denial, with no fix ([Messages](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/pot.md#messages)). A root that granted a loopback host loses it:
   forwarding one port (`host-loopback:PORT`) is reserved for a later release.
 - `~/.pi/agent/mcp-auth.json` joins pot's hidden floor.
 - `kit/1` and `pot-kits/1` are unchanged (the second quiet release), and no existing grant asks again.
@@ -196,7 +260,7 @@ From the Mac checks of v2.19.1 (Seatbelt, which platform-vm cannot run). Both fi
 
 - To run pi in pot: add `kits.pi` to the root, bind each `credential` that
   `pot explain pi` lists (`credential."HOST kit=pi"`), rebuild the root, and run `pot grant pi`
-  ([Set up a root](docs/guides/run-in-a-sandbox.md#set-up-a-root)).
+  ([Set up a root](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/run-in-a-sandbox.md#set-up-a-root)).
 - A run that reached a service on the host's loopback (a granted `127.0.0.1:PORT`, or a name that resolves there)
   is now refused: run that command on the host (`pot host CMD`), or serve it on another address.
 
@@ -218,7 +282,7 @@ pot, graft's sandbox (experimental), in three parts:
 `kit/1` and `pot-kits/1` are unchanged (the first of the two quiet releases pot's split waits for). Linux runs keep
 their canonical grant items and digests (`pot-golden` holds them). **No grant asks again** when a root takes
 v2.18.0; a consumer that takes it asks once for its own repo kit, and a kit whose commands request nothing needs no
-grant ([Move to v2.18.0](docs/guides/move-to-v2-18.md)).
+grant ([Move to v2.18.0](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/move-to-v2-18.md)).
 
 ### Upgrading
 - **Roots first:** take v2.18.0 and `home-manager switch` (on a Mac, rebuild), so `~/.config/pot/launcher` names a
@@ -231,7 +295,7 @@ grant ([Move to v2.18.0](docs/guides/move-to-v2-18.md)).
   dispatch clones carry it.
 - **Anything that must not run pot** (CI, Nix checks, containers, a scheduler's worker) takes
   `packages.<system>.tools.passthru.unwrapped`.
-- **Providers:** declare `commands`, `recipes` and `hook` ([Declare kit commands](docs/guides/kit-commands.md)).
+- **Providers:** declare `commands`, `recipes` and `hook` ([Declare kit commands](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/kit-commands.md)).
 - **On macOS, `git commit` inside `pot claude` stops at a wrapped pre-commit hook**, because the hook command would
   nest: commit on the host, or `git commit --no-verify`. With pot still off on a Mac (no launcher), wrappers run
   unwrapped, and commits there are unaffected.
@@ -244,8 +308,8 @@ grant ([Move to v2.18.0](docs/guides/move-to-v2-18.md)).
   stand in for state, fixed files and fixed directories; protected paths are path rules (no write, no new hard
   link, no rename or removal); `inspect` reads allow-then-deny; the network is the proxy's port on the loopback with
   a per-run token (`407` without it); the run is its own process group, stopped with what left it when the command
-  exits ([On macOS](docs/reference/pot.md#on-macos)). A run can read the arguments and environment of this user's
-  other processes (Seatbelt does not check `KERN_PROCARGS2`): [residual 22](docs/reference/pot.md#residual-risks).
+  exits ([On macOS](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/pot.md#on-macos)). A run can read the arguments and environment of this user's
+  other processes (Seatbelt does not check `KERN_PROCARGS2`): [residual 22](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/pot.md#residual-risks).
 - **The proxy's token** (`POT_PROXY_TOKEN`, from the backend): every request must carry it as its
   `Proxy-Authorization` password. bubblewrap's proxy, on a socket only its run sees, has none.
 - **Wrappers** for every declared kit command (any kit minor), in `tools` and `devShells.default`; `apps` and
@@ -255,32 +319,32 @@ grant ([Move to v2.18.0](docs/guides/move-to-v2-18.md)).
   run, policy.json decides first: the wrapper execs the run's own pot beside it (`/run/pot/launcher`; under
   Seatbelt `<run dir>/launcher`), or exits 126 (`pot: NAME: this run's launcher (/run/pot/launcher) is missing, so
   its children table can't be reached: run NAME on the host`); an older pot's run gets the program under its policy
-  ([Wrapped commands](docs/reference/pot.md#wrapped-commands)).
+  ([Wrapped commands](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/pot.md#wrapped-commands)).
 - `pot run --command NAME --manifest M -- ARGS`, the wrappers' entry, no longer reserved. It runs in the root's
   `defaultContext` with the command's `access`; a `read` command runs in a root repository too.
 - `<scions>/kits.just`, written by `graft add`, `sync` and `upgrade` (through a temporary file; a link is refused)
   and compared by `graft check`, where the repository uses it: the file exists, or the top `justfile` names it.
   Arguments are single-quoted. A kit recipe with the name of one of the justfile's own fails `graft check`
-  ([Files](docs/reference/files.md#kitsjust)).
+  ([Files](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/files.md#kitsjust)).
 - Recipe checks in every kit version: a name `[A-Za-z][A-Za-z0-9_-]*`, literal words of
   `[A-Za-z0-9._/=:,@+%-]`, one space apart (`pot: FILE: recipes.N: literal words only (letters, digits and . _ / =
   : , @ + % -, one space apart)`).
 - Hook commands: `GIT_INDEX_FILE` passes only when it names this repository's index
-  ([Hook commands](docs/reference/pot.md#hook-commands)). Dispatch clones carry a relative, tracked
+  ([Hook commands](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/pot.md#hook-commands)). Dispatch clones carry a relative, tracked
   `core.hooksPath`, so their commits run the hook command too.
 - The children table in `policy.json` and `pot explain`'s `children` row; nested children in bubblewrap, with a
   proxy that forwards to the parent's; the `nest` guarantee. A child that needs write access under a read run is
   refused (`needs write access`); a nested child's denials name its kit's `requests.network`, with no `one run:`
   line. On macOS, every row that would nest is refused (`pot (work): check-kb runs under its own, narrower policy,
   and Seatbelt cannot nest (a run on macOS starts no runs inside it): run it on the host (just check-kb)`); a row
-  whose policy equals the run's still execs in place ([Nesting](docs/reference/pot.md#nesting-and-the-children-table)).
+  whose policy equals the run's still execs in place ([Nesting](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/pot.md#nesting-and-the-children-table)).
 - Nested `pot dispatch` and `--detach` (Linux), through the run's `dispatch` rows: the child's clone in
   `runs/<parent>/children/`, kept after the parent, staged by the host itself once the parent has ended;
   `pot review PARENT/CHILD --fetch` into `refs/remotes/pot-PARENT-CHILD/*`; inside the parent, `pot runs` lists
   children and `pot review CHILD --json` shows their commits (a claim); children killed with their parent, logged
   by the host (`killed: "parent"`). Limits: only the child's top repository is staged (not its scions),
   `clones.maxSize` does not count children, and a grandchild gets no children table
-  ([Nested dispatch](docs/reference/pot.md#nested-dispatch)).
+  ([Nested dispatch](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/pot.md#nested-dispatch)).
 - `pot doctor`: `nest` among the proved guarantees; with no launcher, `~/.config/pot/launcher is missing: a kit
   command's wrapper here runs its program without pot, and says so`.
 - policy.json's `mounts.launcher`: every v2.18.0 run has its own pot beside its policy, read-only.
@@ -336,7 +400,7 @@ anthropic and Bedrock instances' canonical grant items and digests are unchanged
   in its place. `agent.select.env` adds the `ANTHROPIC_BASE_URL`, so a shell set up for the gateway picks the gateway
   instance over one that shares its config folder. A url that is not https, or names a port other than 443, fails
   evaluation: `graft.apis.gateway: url = "http://…": give https://HOST[/PATH] (pot reaches HOST on port 443)`
-  ([the claude-code kit](docs/reference/pot.md#claude-code)).
+  ([the claude-code kit](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/pot.md#claude-code)).
 
 ### Fixed
 - **A missing token file was found only after the grant prompts, and a dispatch left its clone behind.** A run now
@@ -347,12 +411,12 @@ anthropic and Bedrock instances' canonical grant items and digests are unchanged
   kit=claude-code@flexion): claude setup-token, saved with mode 600, then start again`, else `create it, with mode
   600`. A dispatch refused there leaves no clone and no run folder (v2.17.0 kept a stopped run with its clone,
   about 190 MB for flexion-assistant). The file is checked by path and mode alone, never opened. `pot explain` and
-  `pot why` do not check ([the binding check](docs/reference/pot.md#key-files)).
+  `pot why` do not check ([the binding check](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/pot.md#key-files)).
 
 ### Upgrading
 - Nothing to change. To use a gateway, add an instance with `api = graft.apis.gateway { url = "…"; }` and a
   credential binding for its host, then grant it once: `pot grant claude-code@NAME`
-  ([Run in a sandbox](docs/guides/run-in-a-sandbox.md)).
+  ([Run in a sandbox](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/run-in-a-sandbox.md)).
 
 ## v2.17.0 - 2026-11-18
 
@@ -361,7 +425,7 @@ pot, graft's sandbox (experimental), in three parts:
 - **Dispatch: unattended work in a clone.** `pot dispatch CMD` runs a command in a throwaway clone in pot's state.
   Its commits reach your repository only when you review and fetch them (`pot review ID --fetch`, into
   `refs/remotes/pot-<id>/*`). Every run leaves a record that `pot runs` reads (contract
-  [runs/1](pot/contracts/runs-1.md)). A 125 is recorded as `stopped` and turns its workmux pane `waiting`, and runs
+  [runs/1](https://github.com/danielnaab/graft/blob/v2.22.0/pot/contracts/runs-1.md)). A 125 is recorded as `stopped` and turns its workmux pane `waiting`, and runs
   without a terminal get memory and task limits.
 - **Grants and doctor.** `pot grant` with no argument offers what stopped runs wait for, and `--commit` commits the
   grants file. A repo kit's grant now holds across changes outside its defining files. `pot doctor` checks what
@@ -372,7 +436,7 @@ pot, graft's sandbox (experimental), in three parts:
   pot's split waits for two such releases.
 
 **No grant asks again** when a root takes v2.17.0 (one caveat below), and a consumer still on v2.16.x keeps working
-under it ([Move to v2.17.0](docs/guides/move-to-v2-17.md)).
+under it ([Move to v2.17.0](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/move-to-v2-17.md)).
 
 ### Upgrading
 - **Roots: replace the removed forms first.** `defaultAccount`, the claude-code kit's `account`, `provider` and
@@ -416,7 +480,7 @@ under it ([Move to v2.17.0](docs/guides/move-to-v2-17.md)).
 
 ### Added: dispatch
 - **`pot dispatch [--from REF] [--detach] CMD`,** and `--clone` (`--mode clone`) for another context
-  ([pot: dispatch](docs/reference/pot.md#dispatch), [Work in a clone](docs/guides/dispatch.md)):
+  ([pot: dispatch](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/pot.md#dispatch), [Work in a clone](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/dispatch.md)):
   - the clone is in pot's state (`runs/<id>/clone/`), at the base (`--from`, default `HEAD`), keeping only the base's
     branch; the first level of submodules is cloned too, each at its gitlink only. It carries `user.name`,
     `user.email` and the origin URL, and none of your other config or hooks;
@@ -496,7 +560,7 @@ under it ([Move to v2.17.0](docs/guides/move-to-v2-17.md)).
   starts`.
 
 ### Added: contracts
-- **Kit 1.2** ([kit/1](pot/contracts/kit-1.md)), read now and used from v2.18.0: `commands.<n>.hook` (one of
+- **Kit 1.2** ([kit/1](https://github.com/danielnaab/graft/blob/v2.22.0/pot/contracts/kit-1.md)), read now and used from v2.18.0: `commands.<n>.hook` (one of
   `pre-commit`, `commit-msg`, `prepare-commit-msg`, `pre-push`, `post-checkout`, `post-merge`) and the `recipes`
   attrs form `{ run; description; }`, whose first word must be one of the kit's commands. A 1.3 kit gets
   `pot: FILE: kit version 1.3 is newer than this pot reads (1.0, 1.1, 1.2): take a newer pot`.
@@ -622,12 +686,12 @@ output, or `/run/pot/denials`, may.
 A one-way boundary between graft and pot, graft's sandbox (experimental): graft calls one function of pot's,
 `graft.lib.pot.kitsFor`, and pot finds a repository's kits from git facts alone, never from graft's files. graft's
 command is built from graft's sources only, so a change to pot no longer changes it. The formats the two share are
-written down as versioned contracts ([pot's contracts](pot/contracts/README.md), and graft's
-[provider/2](docs/reference/provider.md)). pot's core loses its knowledge of any one agent: an agent kit says, in
+written down as versioned contracts ([pot's contracts](https://github.com/danielnaab/graft/blob/v2.22.0/pot/contracts/README.md), and graft's
+[provider/2](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/provider.md)). pot's core loses its knowledge of any one agent: an agent kit says, in
 kit 1.1, how pot recognises it and its instances; a run names an instance with `CMD@NAME`; and the claude-code kit
 takes an `api` value. Most repositories and roots need no edit: the old forms work, with a warning, until v2.17.0,
 and each side reads the other's v2.15.0 form, so you can move them in either order, as long as providers keep
-their kits in v2.15.0's form until v2.17.0 and a consumer's own kit uses no kit 1.1 field (`dirs`, `agent`) ([Move to v2.16.0](docs/guides/move-to-v2-16.md)).
+their kits in v2.15.0's form until v2.17.0 and a consumer's own kit uses no kit 1.1 field (`dirs`, `agent`) ([Move to v2.16.0](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/move-to-v2-16.md)).
 
 ### Upgrading
 - **A repo kit with powerful requests asks for one new grant.** Taking v2.16.0 changes the flake's `flake.lock`,
@@ -658,7 +722,7 @@ their kits in v2.15.0's form until v2.17.0 and a consumer's own kit uses no kit 
 - **`policy.json` values:** pot's own defaults are `{ "root": "default" }` (was `{ "root": "graft" }`). The bundle's
   protected paths are `{ "root": "bundle", "why": "the repository's pot-kits" }`; the scions-directory item is
   gone. `pot explain` labels pot's defaults `(pot)` (was `(graft)`) and the bundle's protected paths `(repo)`.
-  A reader that matched on `"graft"` must match `"default"` ([run-env/1](pot/contracts/run-env-1.md)).
+  A reader that matched on `"graft"` must match `"default"` ([run-env/1](https://github.com/danielnaab/graft/blob/v2.22.0/pot/contracts/run-env-1.md)).
 - **graft's flake has no `knowledge-base-kit` input:** it leaves consumers' locks at their next update. graft's
   own docs check is `nix flake check ./dev`.
 - **The instance follows the caller's variables, most specific first.** v2.15.0 picked the claude-code instance
@@ -708,12 +772,12 @@ The old and new forms give byte-identical canonical requests (the checks `pot-go
 grant asks again.
 
 ### Added
-- **`graft.lib.pot.kitsFor { pkgs; self; scions; tools; files; }`** (contract [pot-lib/1](pot/contracts/pot-lib-1.md)):
+- **`graft.lib.pot.kitsFor { pkgs; self; scions; tools; files; }`** (contract [pot-lib/1](https://github.com/danielnaab/graft/blob/v2.22.0/pot/contracts/pot-lib-1.md)):
   pot's library, the one Nix edge between graft and pot. It validates each kit and writes
-  **`packages.<system>.pot-kits`** (contract [pot-kits/1](pot/contracts/pot-kits-1.md)): `kit.json`
+  **`packages.<system>.pot-kits`** (contract [pot-kits/1](https://github.com/danielnaab/graft/blob/v2.22.0/pot/contracts/pot-kits-1.md)): `kit.json`
   (`{ version = 1; self; scions; protect; }`, each kit with its `file`), `bin/` and `closure`. mkFlake calls it and
   reads no kit field.
-- **`pot why HOST|HOST:PORT|URL|PATH --json`** (contract [run-env/1](pot/contracts/run-env-1.md)), on the host and inside
+- **`pot why HOST|HOST:PORT|URL|PATH --json`** (contract [run-env/1](https://github.com/danielnaab/graft/blob/v2.22.0/pot/contracts/run-env-1.md)), on the host and inside
   a run: `{ version, target, kind, reach, reached, context, text }`, exit 0 when reached and 1 when not. `kind` is
   `network`, `git.fetch` (an ssh URL, reached when a `git.fetch` binding covers it) or `file` (a `file://` URL or a
   path, reached when the run sees it). On the host it answers from the policy a run of the default context would
@@ -731,8 +795,8 @@ grant asks again.
   kit and a repo kit, as v2.15.0 wrote them.
 - **Instances:** `pot CMD@NAME` and `--instance NAME` choose an instance of an agent kit; mkRoot's and
   `programs.pot`'s `defaultInstance.<kit>` gives each kit's default. With none of them, the caller's variables
-  choose ([kit/1: Instances](pot/contracts/kit-1.md#instances)).
-- **Kit 1.1** ([kit/1](pot/contracts/kit-1.md)): `version` (`"1.0"` when missing; a newer minor gets one refusal,
+  choose ([kit/1: Instances](https://github.com/danielnaab/graft/blob/v2.22.0/pot/contracts/kit-1.md#instances)).
+- **Kit 1.1** ([kit/1](https://github.com/danielnaab/graft/blob/v2.22.0/pot/contracts/kit-1.md)): `version` (`"1.0"` when missing; a newer minor gets one refusal,
   `pot: FILE: kit version 1.2 is newer than this pot reads (1.0, 1.1): take a newer pot`); `tools`; `agent` (a
   root's kit only: `markers`, `select.env`, `resume` and `hooks`); and the command field `dirs`, with the modes
   `links` and `mirror`, in place of 1.0's `fixedDirs`, `realDirs`, `skillDirs` and `memory`. A mirror shows a host
@@ -743,7 +807,7 @@ grant asks again.
   no root removes, `CODEX_SANDBOX` and `CLAUDECODE`, and to each root kit's `agent.markers` and `POT`, so `pot grant`
   refuses under an agent whatever kits the root has.
 - **`policy.json`:** a file that a mirror puts in the run has `"mirror": "<label>"`, beside v2.15.0's
-  `"memory": true`, which stays ([run-env/1](pot/contracts/run-env-1.md)).
+  `"memory": true`, which stays ([run-env/1](https://github.com/danielnaab/graft/blob/v2.22.0/pot/contracts/run-env-1.md)).
 - **The flake check `pot-aliases`:** the deprecated forms give the same canonical requests as the new.
 
 - **`pot host CMD`** runs the workspace bundle's command when `CMD` is not on the host's `PATH`, so the
@@ -806,7 +870,7 @@ last release with a Seatbelt sandbox. **This minor version breaks v2.14.0's sand
   `pot` package; the two collide only on a `PATH` that has both.
 - A repository whose `just check` runs `graft check` inside a run needs the `nix` capability in its kit, a
   `POT_TOOLS` branch in its `ensure.sh`, and a `graft_run` that uses `graft` from `PATH`
-  ([Move from v2.14.0's sandbox](docs/guides/move-from-the-v2-14-sandbox.md)). **A `nix` request does nothing
+  ([Move from v2.14.0's sandbox](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/move-from-the-v2-14-sandbox.md)). **A `nix` request does nothing
   until your root binds it** (`nix."*" = { via = "daemon-untrusted"; };`) and you run `pot grant`.
 - **A powerful repo-kit grant is fixed to the flake directory as committed and staged.** Each commit or staged
   change under it changes the source: the next run stops with exit 125, lists the changed paths, and `pot grant`
@@ -825,7 +889,7 @@ last release with a Seatbelt sandbox. **This minor version breaks v2.14.0's sand
   each start from the run's kits (the command's, the repository's, its scions', and the root kits its context
   includes) and the person's grants. Contexts: `work` (the default: write the repository in place), `inspect`
   (read the machine except secrets, change nothing), `host` (no sandbox, said out loud). bubblewrap, on Linux
-  ([pot](docs/reference/pot.md), [Run commands in pot](docs/guides/run-in-a-sandbox.md)).
+  ([pot](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/pot.md), [Run commands in pot](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/run-in-a-sandbox.md)).
 - **Kits:** `kit = { packages; env.set; files; protect; requests; commands; recipes; }` in `graft.nix` and
   mkFlake's `perSystem`, with `perSystem.kitArgs`. mkFlake exports them, with the workspace's tools and `graft`,
   as `packages.<system>.graft-kits`.
@@ -867,7 +931,7 @@ last release with a Seatbelt sandbox. **This minor version breaks v2.14.0's sand
 - **`graft check` inside an `pot` run** tries only the provider URLs that the run reaches, and prints one note
   instead of leaving a denial.
 - **Root repositories:** `work` refuses in a root's own repository, and names `pot inspect` or plain `claude`.
-- **The decision** behind it: [Roots grant reach; kits only ask](docs/decisions.md#roots-grant-reach-kits-only-ask).
+- **The decision** behind it: [Roots grant reach; kits only ask](https://github.com/danielnaab/graft/blob/v2.22.0/docs/decisions.md#roots-grant-reach-kits-only-ask).
 
 ### Not yet
 - Synced claude.ai skills do not load inside a run: Claude loads them only when signed in to claude.ai, and a run
@@ -895,8 +959,8 @@ Nothing to change: a repository that declares no `sandbox` gets graft's base pol
   empty environment but for what the policy names, and no network.
   `sandbox [--with PKG]... [--allow HOST[:PORT]]... [--explain [--json]] [--dry-run] [--] [CMD [ARGS...]]`;
   with no command, `bash`. Exit status: the command's; `127` for a command not on the sandbox's `PATH`; `2`
-  for a usage error ([Sandbox](docs/reference/sandbox.md),
-  [Run an agent or a command in a sandbox](docs/guides/run-in-a-sandbox.md)).
+  for a usage error ([Sandbox](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/sandbox.md),
+  [Run an agent or a command in a sandbox](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/run-in-a-sandbox.md)).
 - **`sandbox` in `graft.nix` and `perSystem`:** `packages`, `env.set`, `protect`, `repository.readOnly`,
   `paths.readOnly`, `paths.writable`, `network.allow`, `env.pass` and `grant`, merged by Nix. A provider may
   add to what the run can see (`packages`, `env.set`, `protect`), never to what it can reach: its
@@ -917,11 +981,11 @@ Nothing to change: a repository that declares no `sandbox` gets graft's base pol
 - **On macOS**, the same policy as a Seatbelt profile that denies by default: the closure's store paths and
   the macOS files a process needs, read-only; the repository writable but for the protected paths; `HOME`
   and `TMPDIR` new temporary folders; the network only through the proxy, on a `127.0.0.1` port
-  ([On macOS](docs/reference/sandbox.md#on-macos)). A new hard link to a protected file is denied. One
+  ([On macOS](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/sandbox.md#on-macos)). A new hard link to a protected file is denied. One
   limit: Seatbelt does not check `KERN_PROCARGS2`, so a run can read the environment of the user's other
   processes. `tests/macos-smoke.sh` checks it on a Mac.
 - **The decision** behind it, with its costs: the sandbox protects the host, not the repository's history
-  ([Decisions](docs/decisions.md#enforce-the-boundary-in-a-sandbox-not-in-rules)). graft's scope is now Nix,
+  ([Decisions](https://github.com/danielnaab/graft/blob/v2.22.0/docs/decisions.md#enforce-the-boundary-in-a-sandbox-not-in-rules)). graft's scope is now Nix,
   git submodules, a tag comparison, and the sandbox policy their operations run under.
 
 ### Upgrading
@@ -942,7 +1006,7 @@ Nothing to change: a repository that declares no `sandbox` gets graft's base pol
   knowledge-base-kit from a `flake = false` input at its scion's commit. `nix run github:…/v2.13.0 -- …`
   (graft's command, not an input) was not affected.
 - The docs said `github:` inputs were not affected by a flake's `inputs.self.submodules`: they are. A flake
-  that others take as an input must not declare it ([Nix behaviours](docs/reference/nix-behaviours.md)).
+  that others take as an input must not declare it ([Nix behaviours](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/nix-behaviours.md)).
 
 ### Upgrading
 - On v2.13.0: set `inputs.graft.url` to `github:danielnaab/graft/v2.13.1`, run `nix flake update graft`, and
@@ -958,7 +1022,7 @@ steps. Needs Nix 2.27 or later.
 
 ### Upgrading
 
-These are also a guide: [Move from copy mode](docs/guides/move-from-copy-mode.md).
+These are also a guide: [Move from copy mode](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/move-from-copy-mode.md).
 
 1. On a branch, note each scion's tag: `nix run .#graft outdated` (before you upgrade graft).
 2. `git rm -r -q scions` (your scions directory), so the copied files leave the index and the working tree.
@@ -979,7 +1043,7 @@ These are also a guide: [Move from copy mode](docs/guides/move-from-copy-mode.md
    Commit, then run `nix flake check` and `nix run .#graft check`.
 6. Fix paths that named the old scions directory: links, `just` imports (use `import?`), hooks, source imports,
    lint excludes. Replace the "never edit scions" agent rule with the section in
-   [Graft your first pattern](docs/guides/graft-a-repository.md#steps), step 6, and make an agent tool's rule
+   [Graft your first pattern](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/graft-a-repository.md#steps), step 6, and make an agent tool's rule
    that denies edits to the scions directory ask instead (Claude Code: move `Edit(scions/**)` from
    `permissions.deny` to `permissions.ask`): a scion edit is now a provider fix that a person approves.
 7. Commit and push.
@@ -1003,7 +1067,7 @@ the scions untouched; every command then says the scions README is copy mode. Fo
   `try` only reports. Replaces the scratch-file steps of the guides.
 - **`graft.nix`:** a provider's tools (`packages.<system>.tools`, one environment for every provider), apps,
   packages and checks (`checks.<system>.<scion>-<name>`), with `requires` for providers it needs. Arguments
-  `pkgs`, `lib`, `system`, `scion`, `scions`, `consumer` ([Files](docs/reference/files.md#graftnix)).
+  `pkgs`, `lib`, `system`, `scion`, `scions`, `consumer` ([Files](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/files.md#graftnix)).
 - **mkFlake's `perSystem`:** a consumer's own tools, apps, packages, checks and dev shells, merged like a
   provider's.
 - **`graft check` rules:** every scion registered as a gitlink (not as files), filled (with its own
@@ -1019,10 +1083,10 @@ the scions untouched; every command then says the scions README is copy mode. Fo
 - **mkFlake names a wrong `dir`:** `graft: graft's README is in scions/ but mkFlake's dir is "DIR": set dir = "scions"; …`.
 - **`add`** notes each sibling the new scion's `graft.nix` requires that you do not graft, with its
   `graft add` line.
-- Guides: [Clones, worktrees, sandboxes and CI](docs/guides/clones-and-worktrees.md) (empty scions, the
-  post-checkout hook, git settings), [Fix a provider from a consumer](docs/guides/fix-a-provider.md),
-  [Write a provider's graft.nix](docs/guides/write-graft-nix.md), and
-  [Move from copy mode](docs/guides/move-from-copy-mode.md).
+- Guides: [Clones, worktrees, sandboxes and CI](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/clones-and-worktrees.md) (empty scions, the
+  post-checkout hook, git settings), [Fix a provider from a consumer](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/fix-a-provider.md),
+  [Write a provider's graft.nix](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/write-graft-nix.md), and
+  [Move from copy mode](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/move-from-copy-mode.md).
 
 ### Changed
 - Every fill graft does or advises is recursive: `git submodule update --init --recursive`.
@@ -1044,12 +1108,12 @@ the scions untouched; every command then says the scions README is copy mode. Fo
   table, no `<!-- graft flake: -->` line. `check` reads only its marker line.
 - **The `# graft ssh:` line** may be in either workflow, and installs the key before every step that runs
   graft: the check, the upgrade and the pr step. `paths-ignore` may not match `.gitmodules`.
-- [Concepts](docs/concepts.md), [Decisions](docs/decisions.md) (Pin with git submodules; let providers wire
+- [Concepts](https://github.com/danielnaab/graft/blob/v2.22.0/docs/concepts.md), [Decisions](https://github.com/danielnaab/graft/blob/v2.22.0/docs/decisions.md) (Pin with git submodules; let providers wire
   themselves), and every guide and reference page are rewritten for submodules.
-  [Ship a tool or seed files](docs/guides/ship-tools.md) is now
-  [Write a provider's graft.nix](docs/guides/write-graft-nix.md);
-  [Change a grafted file](docs/guides/change-a-grafted-file.md) is now
-  [Fix a provider from a consumer](docs/guides/fix-a-provider.md).
+  [Ship a tool or seed files](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/ship-tools.md) is now
+  [Write a provider's graft.nix](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/write-graft-nix.md);
+  [Change a grafted file](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/change-a-grafted-file.md) is now
+  [Fix a provider from a consumer](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/fix-a-provider.md).
 
 ### Removed
 - Copy mode: committed copies of exports, the drift check and report, `checks.<system>.graft`, export rules
@@ -1096,62 +1160,62 @@ weekly upgrade onto this version opens no pull request, because graft's workflow
   re-locking). Run `nix run .#graft`, and commit `flake.lock`.
 
 ### Added
-- **[`graft check` fails](docs/guides/check-fails.md):** a guide to finding what changed in a scion
+- **[`graft check` fails](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/check-fails.md):** a guide to finding what changed in a scion
   (an edit, a formatter, a tool's `__pycache__/`), saving a change someone meant, restoring the pins, and
   keeping tools out of the scions directory. It replaces the list of causes in Graft a repository.
-- **[Change a grafted file](docs/guides/change-a-grafted-file.md):** a guide to changing what a scion
+- **[Change a grafted file](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/change-a-grafted-file.md):** a guide to changing what a scion
   gives you without editing it: keep your own version of a file, change a setting that a provider's tool
   reads, fix it in the provider and take the release, or stop grafting a provider (`mkFlake`'s `scions`).
-- **[Make a pattern's checks gate your merges](docs/guides/gate-merges.md):** a guide to running a
+- **[Make a pattern's checks gate your merges](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/gate-merges.md):** a guide to running a
   provider's checker from its fetched export in `nix flake check`, a workflow that runs it on each pull
   request, and the Forgejo branch rule that requires it. graft's `graft-check.yaml` stays graft's drift
   check: your checks are a status of their own. It says why graft's weekly upgrade pull request gets no
   status from your workflow until a person reopens it.
-- **[Ship a tool or seed files with a pattern](docs/guides/ship-tools.md):** a tool that consumers build
+- **[Ship a tool or seed files with a pattern](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/ship-tools.md):** a tool that consumers build
   from the fetched export with the provider's `package.nix`, seed files as a flake template, and a recipe
   for a step after each upgrade.
-- **[Ship and take an incompatible change](docs/guides/incompatible-change.md):** a guide in two parts. The
+- **[Ship and take an incompatible change](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/incompatible-change.md):** a guide in two parts. The
   provider writes Upgrading steps, tries them on a throwaway worktree of a real consumer (`nix flake lock
   --override-input`, then `graft migrate`), and tags the new major version. The consumer takes it on a branch
   with `upgrade NAME@TAG`, works from `graft migrate`'s brief, and opens a pull request. It says which base
   `migrate` compares with, what to do when a provider renames its repository, and which Upgrading
   headings graft finds. It replaces "Cross a major version" in Upgrade and "Make an incompatible change"
   in Publish, which now link to it.
-- **[Nix behaviours](docs/reference/nix-behaviours.md)**: trailing-slash rules fail only for fetches from
+- **[Nix behaviours](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/nix-behaviours.md)**: trailing-slash rules fail only for fetches from
   a bare clone, not through `git+file` to a checkout; and Nix 2.24 reuses a consumer's `github:` fetch of a
   commit for `.` at that commit, so a repository whose export rules exclude its own `flake.nix` fails there.
-- **`tests/fixtures.sh`** builds the repositories that a guide is read against ([Development](docs/development.md)).
+- **`tests/fixtures.sh`** builds the repositories that a guide is read against ([Development](https://github.com/danielnaab/graft/blob/v2.22.0/docs/development.md)).
 - **`nix flake init -t` says what to run for a flake in a subdirectory**: `nix run 'path:DIR#graft'` from
   the repository's top, since `nix run .#graft` there copies the whole repository into the Nix store.
 
 ### Changed
 - **Guides renamed, each now one goal with numbered steps, a check, and its real failures.** The old URLs
   stay.
-  - Graft a repository is now [Graft your first pattern](docs/guides/graft-a-repository.md), a tutorial
+  - Graft a repository is now [Graft your first pattern](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/graft-a-repository.md), a tutorial
     for a new or an existing repository (an existing flake's outputs, its own `flake = false` inputs, a
     `.gitignore` that drops `flake.lock`). Its section "Try a provider's unreleased change" moved to
-    [Take a newer version by hand](docs/guides/upgrade.md#try-a-providers-unreleased-change).
-  - Upgrade is now [Take a newer version by hand](docs/guides/upgrade.md): `outdated`, `changelog`,
+    [Take a newer version by hand](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/upgrade.md#try-a-providers-unreleased-change).
+  - Upgrade is now [Take a newer version by hand](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/upgrade.md): `outdated`, `changelog`,
     `upgrade`, the scions diff, the check, and which files to commit.
-  - Publish is now [Publish a pattern](docs/guides/publish.md), the steps of one release: export rules,
+  - Publish is now [Publish a pattern](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/publish.md), the steps of one release: export rules,
     the CHANGELOG section, the export listed with `git archive` and checked for trailing-slash rules, the
     tag (prefer lightweight; signed or annotated works, with one re-pin for `git+` consumers), the push, and
     the consumer's upgrade.
-  - CI is now [Run graft in CI and review its upgrade pull requests](docs/guides/ci.md), a guide to the
+  - CI is now [Run graft in CI and review its upgrade pull requests](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/ci.md), a guide to the
     weekly upgrade pull request: what its title and description say, the newer major versions it holds, what
     to read in the scions diff, and what to do when its checks fail or the pull request is not opened. It
     shows how to run the steps by hand (on GitHub, say) and how to check many repositories with `outdated -C`.
-  - A flake in a subdirectory is now [Keep private files out of the Nix store](docs/guides/flake-in-a-subdirectory.md):
+  - A flake in a subdirectory is now [Keep private files out of the Nix store](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/flake-in-a-subdirectory.md):
     numbered steps from a flake at the top or from no flake, a check that proves the store copy is only the
     subdirectory, and what to do about copies already in the store. It says that a repository's own check
     named `graft` is dropped from `checks` in a subdirectory flake, and that graft's app then fails to
     evaluate.
-  - Private providers is now [Graft a private repository](docs/guides/private-providers.md), with the step
+  - Private providers is now [Graft a private repository](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/private-providers.md), with the step
     that Nix 2.24 needs to make the first lock of a `git+ssh` input at a tag (`nix flake prefetch` at
     `refs/tags/TAG`): without it, the old page's pin failed with `revspec 'v1.0.0' not found`. Its section
     "Check in CI" is now its steps 4 to 10. It makes the CI key outside the repository, and says why
     graft-upgrade cannot run with a private scion, by design, and how to upgrade instead.
-- **Moved to [Files](docs/reference/files.md)**: what to export and how to name a provider (from Publish),
+- **Moved to [Files](https://github.com/danielnaab/graft/blob/v2.22.0/docs/reference/files.md)**: what to export and how to name a provider (from Publish),
   graft's workflows' `paths-ignore` line, and how to keep your own edits to a workflow (from CI).
 - **One drift report for `graft check` and `nix flake check`** (lib/drift.sh). It names each file as the
   repository does (`scions/NAME/FILE`), not by a temporary directory or a store path: `edited`, with a
@@ -1265,9 +1329,9 @@ Docs, graft grafts its own scions, and two fixes to what graft reads.
 
 ### Changed
 - **The README is now a set of short pages.** `README.md` says what graft is, explains the scion metaphor
-  and gives a quick start. `docs/` has [concepts](docs/concepts.md), six guides, three reference pages
-  (commands, files, Nix behaviours), [decisions](docs/decisions.md) and [development](docs/development.md).
-  Each section of the v2.10.0 README is on one of these pages, and [CI security](docs/ci-security.md)
+  and gives a quick start. `docs/` has [concepts](https://github.com/danielnaab/graft/blob/v2.22.0/docs/concepts.md), six guides, three reference pages
+  (commands, files, Nix behaviours), [decisions](https://github.com/danielnaab/graft/blob/v2.22.0/docs/decisions.md) and [development](https://github.com/danielnaab/graft/blob/v2.22.0/docs/development.md).
+  Each section of the v2.10.0 README is on one of these pages, and [CI security](https://github.com/danielnaab/graft/blob/v2.22.0/docs/ci-security.md)
   explains the upgrade workflow's two jobs. The v1 table's `commands:` row now says what
   consumers do: load a provider's code from the same input.
 - **graft grafts knowledge-base-kit** (v2.1.0) with this checkout's own `mkFlake` (not a pinned graft), into

@@ -3,69 +3,72 @@ status: working
 ---
 # Files
 
-The files graft reads and writes, and the lines in them that graft recognizes.
+The files tuteur reads and writes, and the lines in them that tuteur recognizes.
 
 ## In a consumer
 
 | File | Read or written | Purpose |
 |---|---|---|
-| `flake.nix` | Read as data. `upgrade` changes graft's tag. | The input named `graft` is graft's pin. A top-level flake declares `inputs.self.submodules = true;`. Names no provider. |
-| `flake.lock` | Written by Nix, and by `upgrade` for graft's input. | graft's commit and hash, and nixpkgs if you have one. No provider entries. Must be committed: `graft ci check` fails when it is not in `HEAD`. |
-| `.gitmodules` | Written by `git submodule add` (through `graft add`) and `git rm`. Read by every command. | Each scion's path and URL. `upgrade` never changes it. |
-| The gitlinks | Written by `add` and `upgrade`, or by `git add scions/NAME`. | The pins. Each must be a gitlink (mode 160000 in `git ls-files -s`), never the scion's files: `check` fails on a registered path tracked as files, and `add` refuses to graft over one. |
-| `<dir>/<name>/` | A submodule. Filled by `git submodule update --init --recursive`, `graft sync`, a recursive clone, or the post-checkout hook. | The provider's whole repository at a release tag. |
+| `flake.nix` | Read as data. `upgrade` changes tuteur's tag, and `pot`'s. | The input named `tuteur` (else `graft`, read through 0.x) is tuteur's pin. An input named `pot`, under pot, gives mkFlake pot's library; at a version tag, `upgrade` moves it too. A top-level flake declares `inputs.self.submodules = true;`. Names no provider. |
+| `flake.lock` | Written by Nix, and by `upgrade` for tuteur's input and `pot`. | tuteur's commit and hash, pot's, and nixpkgs if you have one. No provider entries. Must be committed: `tuteur ci check` fails when it is not in `HEAD`. |
+| `.gitmodules` | Written by `git submodule add` (through `tuteur add`) and `git rm`. Read by every command. | Each pattern's path and URL. `upgrade` never changes it. |
+| The gitlinks | Written by `add` and `upgrade`, or by `git add .patterns/NAME`. | The pins. Each must be a gitlink (mode 160000 in `git ls-files -s`), never the pattern's files: `check` fails on a registered path tracked as files, and `add` refuses to add over one. |
+| `<dir>/<name>/` | A submodule. Filled by `git submodule update --init --recursive`, `tuteur sync`, a recursive clone, or the post-checkout hook. | The provider's whole repository at a release tag. |
 | `<dir>/README.md` | Written by `add` and `sync`; `check` looks for its marker line. | The marker README. |
-| `<dir>/kits.just` | Written by `add`, `sync` and `upgrade`, and staged; compared by `check`. Only where the repository uses it: the file exists, or the top `justfile` names `<dir>/kits.just`. Tracked. | The [generated recipes](#kitsjust). Do not edit. |
-| `.graft-try` | Written by `try`, at the repository's top, and marked with intent to add; removed by `try --stop`. `check` fails while it exists. Never committed. | Makes every Nix build of a git flake read the working tree. Two `#` comment lines. See [try](commands.md#try). |
-| `.forgejo/workflows/graft-*.yaml` | Restored by `sync`, replaced by `upgrade`, compared by `check`. | graft's workflows, if they carry the marker. |
-| Settings files, such as `knowledge-base.yaml` | Read by providers' tools and checks, never by graft. | What a provider lets you configure. Each provider's README names its file. |
+| `<dir>/kits.just` | Written by `add`, `sync` and `upgrade`, and staged; compared by `check`. Only where the repository uses it (the file exists, or the top `justfile` names `<dir>/kits.just`) and the flake has `pot-kits` (`inputs.pot`). Tracked. | The [generated recipes](#kitsjust). Do not edit. |
+| `.tuteur-try` | Written by `try`, at the repository's top, and marked with intent to add; removed by `try --stop`. `check` fails while it exists, and while graft's `.graft-try` does. Never committed. | Makes every Nix build of a git flake read the working tree. Two `#` comment lines. See [try](commands.md#try). |
+| `.forgejo/workflows/tuteur-*.yaml` | Restored by `sync`, replaced by `upgrade`, compared by `check`. `sync` renames graft's marked `graft-*.yaml` to these first. | tuteur's workflows, if they carry the marker. |
+| Settings files, such as `knowledge-base.yaml` | Read by providers' tools and checks, never by tuteur. | What a provider lets you configure. Each provider's README names its file. |
 
-Inside a [pot run](pot.md#protected-paths), the flake directory, `.gitmodules`, `.envrc`, `justfile` and
-`.pre-commit-config.yaml` (at any depth), and the git metadata, are read-only. So are each `graft.nix` and the
-scions directory, which mkFlake names in the bundle's `protect` ([pot-lib/1](../../pot/contracts/pot-lib-1.md)).
+Inside a [pot run](https://github.com/danielnaab/pot/blob/v0.1.0/docs/reference/pot.md#protected-paths), the flake directory, `.gitmodules`, `.envrc`, `justfile` and
+`.pre-commit-config.yaml` (at any depth), and the git metadata, are read-only. So are each `tuteur.nix`, each
+`graft.nix` and the patterns folder, which mkFlake names in the bundle's `protect`
+([pot-lib/1](https://github.com/danielnaab/pot/blob/v0.1.0/contracts/pot-lib-1.md)), when the flake has `inputs.pot`.
 
 ## The marker README
 
-`<dir>/README.md`. `add` writes it when it is missing; `sync`, and `upgrade` when graft's pin moves, write
-it again with this graft version's text (`graft: wrote scions/README.md`). For a flake at the repository's
+`<dir>/README.md`. `add` writes it when it is missing; `sync`, and `upgrade` when tuteur's pin moves, write
+it again with this tuteur version's text (`tuteur: wrote .patterns/README.md`). For a flake at the repository's
 top:
 
 ```markdown
-<!-- managed by graft: https://github.com/danielnaab/graft -->
-# Scions
+<!-- managed by tuteur: https://github.com/danielnaab/tuteur -->
+# Patterns
 
-Each folder here is a git submodule: another repository, grafted at a release tag. Empty folders?
-Run `git submodule update --init --recursive` (or `nix run .#graft sync`).
+Each folder here is a git submodule: another repository's pattern, at a release tag. Empty folders?
+Run `git submodule update --init --recursive` (or `nix run .#tuteur sync`).
 
-- Read them freely. Ask before you edit one: a fix belongs in the provider. See graft's "Fix a provider from
-  a consumer" guide: edit on a branch, test, build with it (`nix run .#graft -- try NAME`, then `nix run .#graft -- try --stop`),
-  push to the provider, release, then `nix run .#graft upgrade NAME`.
-- `nix run .#graft check` fails until every scion is clean and at a release tag, and while try is on.
-- Versions: `nix run .#graft outdated`.
+- Read them freely. Ask before you edit one: a fix belongs in the provider. See tuteur's "Fix a provider from
+  a consumer" guide: edit on a branch, test, build with it (`nix run .#tuteur -- try NAME`, then `nix run .#tuteur -- try --stop`),
+  push to the provider, release, then `nix run .#tuteur upgrade NAME`.
+- `nix run .#tuteur check` fails until every pattern is clean and at a release tag, and while try is on.
+- Versions: `nix run .#tuteur outdated`.
 ```
 
-graft's text is `lib/scions-readme.md`, with `@RUN@` replaced by the flake's run command. For a flake in a
-subdirectory, that is `nix run 'path:nix/agent-tools#graft'`. `check` reads only the marker line.
+tuteur's text is `lib/patterns-readme.md`, with `@RUN@` replaced by the flake's run command. For a flake in a
+subdirectory, that is `nix run 'path:nix/agent-tools#tuteur'`. `check` reads only the marker line.
 
-- **The marker line** is how graft's commands and workflows find the scions directory, and the flake (its
+- **The marker line** is how tuteur's commands and workflows find the patterns folder, and the flake (its
   parent directory). Exactly one per repository.
 - **Other tools skip the directory by it.** knowledge-base-kit's checkers (`kb_linter`, `link_validator`)
   do not walk a directory whose `README.md` has the marker, so they do not check providers' tests and
   fixtures.
-- v2.12.0 and earlier wrote a table of scions and a second line, `<!-- graft flake: DIR -->`. Both are gone;
-  `sync` rewrites the README.
+- graft's marker, `<!-- managed by graft: https://github.com/danielnaab/graft -->`, is read through 0.1.x;
+  `sync` rewrites it, and `check` names it until then.
+- graft v2.12.0 and earlier wrote a table of scions and a second line, `<!-- graft flake: DIR -->`. Both are gone;
+  every command refuses them, naming graft's Upgrading steps.
 
 ## kits.just
 
-`<dir>/kits.just` holds a just recipe for each kit's `recipes` entry and for graft's own (`outdated`, `upgrade`,
-`graft-check`), sorted by name, generated from the flake's `pot-kits` (contract
-[pot-kits/1](../../pot/contracts/pot-kits-1.md)) by evaluation alone (`nix eval --raw
-<flake>#packages.<system>.pot-kits.kitsJust`). graft writes and compares it only where the repository uses it: the
-file exists, or the top `justfile` names it. To start, add the import line below, then `graft sync`. Each body is
-one line that runs a [wrapped command](pot.md#wrapped-commands):
+`<dir>/kits.just` holds a just recipe for each kit's `recipes` entry and for tuteur's own (`outdated`, `upgrade`,
+`tuteur-check`), sorted by name, generated from the flake's `pot-kits`, so only where the flake has `inputs.pot` (contract
+[pot-kits/1](https://github.com/danielnaab/pot/blob/v0.1.0/contracts/pot-kits-1.md)) by evaluation alone (`nix eval --raw
+<flake>#packages.<system>.pot-kits.kitsJust`). tuteur writes and compares it only where the repository uses it: the
+file exists, or the top `justfile` names it. To start, add the import line below, then `tuteur sync`. Each body is
+one line that runs a [wrapped command](https://github.com/danielnaab/pot/blob/v0.1.0/docs/reference/pot.md#wrapped-commands):
 
 ```just
-# Generated by graft from the kits' recipes (pot-kits/1). graft sync writes it and graft check compares it:
+# Generated from the kits' recipes (pot-kits/1) by the bundle's producer, which writes and compares it:
 # do not edit. The importing justfile defines `tools`, the tools package (its root, not its bin/).
 
 # Check links, lifecycle status, and Sources with knowledge-base-kit's checker
@@ -82,38 +85,40 @@ define `tools` as the tools package's root:
 
 ```just
 set allow-duplicate-recipes
-import? "scions/notebook-kit/tools/kit.just"
-import? "scions/kits.just"
+import? ".patterns/notebook-kit/tools/kit.just"
+import? ".patterns/kits.just"
 tools := `nix build --no-link --print-out-paths .#tools`
 ```
 
 Two recipes with one name fail evaluation: `pot: kitsFor: two recipes are named X (FILE and FILE)`; two kits that
-ship one command, `pot: kitsFor: two kits ship a command named X (self and scions.a): a wrapper has one name`.
+ship one command, `pot: kitsFor: two kits ship a command named X (self and patterns.a): a wrapper has one name`.
 A kit's recipe never replaces one of your own: when `kits.just` and the top `justfile`'s own recipes share a name,
-`graft check` fails and `graft sync` warns: `graft: scions/kits.just's recipe X has the name of the justfile's own X:
-rename one (a kit's recipe never replaces yours)`. (A provider's imported `.just` file is not yours: graft does not check it.) graft writes the file through a temporary file and refuses a link: `graft:
-scions/kits.just is a symbolic link; graft writes only a file there: remove it, then graft sync` (the same for the
-marker README; `graft check` reports it too).
-`graft check` fails when the file differs from what the flake generates: `graft sync` writes it again. When the
-bundle does not evaluate, sync leaves the file as it is: `graft: scions/kits.just: the flake's pot-kits doesn't
-evaluate (above); left as it is`.
+`tuteur check` fails and `tuteur sync` warns: `tuteur: .patterns/kits.just's recipe X has the name of the justfile's own X:
+rename one (a kit's recipe never replaces yours)`. (A provider's imported `.just` file is not yours: tuteur does not check it.) tuteur writes the file through a temporary file and refuses a link: `tuteur:
+.patterns/kits.just is a symbolic link; tuteur writes only a file there: remove it, then tuteur sync` (the same for the
+marker README; `tuteur check` reports it too).
+`tuteur check` fails when the file differs from what the flake generates: `tuteur sync` writes it again. When the
+bundle does not evaluate, sync leaves the file as it is: `tuteur: .patterns/kits.just: the flake's pot-kits doesn't
+evaluate (above); left as it is`. With no `pot-kits` (no `inputs.pot`), sync writes none
+(`tuteur: .patterns/kits.just: this flake has no pot-kits (no inputs.pot); not written`), and check fails on a
+`kits.just` that is there. The header is pot's (pot-kits/1); graft's said `Generated by graft`, and `sync` rewrites it.
 
-## `just` imports from a scion
+## `just` imports from a pattern
 
-A justfile that imports a provider's recipes uses `import?` (with `?`), so a fresh clone with empty scions
-still parses: `import? "scions/notebook-kit/tools/kit.just"`. That holds only while no recipe of your own
+A justfile that imports a provider's recipes uses `import?` (with `?`), so a fresh clone with empty patterns
+still parses: `import? ".patterns/notebook-kit/tools/kit.just"`. That holds only while no recipe of your own
 depends on an imported one. A recipe `check: kit-check` makes `just` fail to parse when the import is missing
 (`error: Recipe 'check' has unknown dependency 'kit-check'`), whatever recipe you ask for. Call the imported
 recipe from the body instead, which `just` resolves only when it runs:
 
 ```just
-import? "scions/notebook-kit/tools/kit.just"
+import? ".patterns/notebook-kit/tools/kit.just"
 
 check:
     just kit-check
 ```
 
-## Nested scions: the One-level cost
+## Nested patterns: the One-level cost
 
 A provider's own submodules are filled recursively by `add`, `sync` and `upgrade` (git leaves them empty
 otherwise, and Nix fails on an empty one while a tracked file is modified), and Nix fetches them on every
@@ -127,22 +132,22 @@ living-specifications, then meta-knowledge-base. Keep providers to one level
 | File | Purpose |
 |---|---|
 | Tags | Semver tags (`v1.2.3` or `1.2.3`) are versions. Other tags, such as `v1.3.0-rc.1`, are ignored. A tag may be lightweight, annotated or signed. Never move a released tag: consumers' gitlinks point at its commit. |
-| `CHANGELOG.md` | One `## vX.Y.Z` (or `## X.Y.Z`) section per release; anything can follow the version, such as the date. A major version's section has an `### Upgrading` subsection (graft also takes `### Migration`). graft reads it from the provider's repository at the target tag. |
-| `graft.nix` | Optional. What the provider contributes to a consumer's flake ([below](#graftnix)). |
+| `CHANGELOG.md` | One `## vX.Y.Z` (or `## X.Y.Z`) section per release; anything can follow the version, such as the date. A major version's section has an `### Upgrading` subsection (tuteur also takes `### Migration`). tuteur reads it from the provider's repository at the target tag. |
+| `tuteur.nix` | Optional. What the provider contributes to a consumer's flake ([below](#tuteurnix)). |
 | `README.md` | Say what to point agents at, which tools the provider ships, and which settings file they read. |
-| `.gitattributes` | No longer read by graft. A consumer gets the whole repository. `export-ignore` lines still apply to `git archive`, if you use it. |
+| `.gitattributes` | No longer read by tuteur. A consumer gets the whole repository. `export-ignore` lines still apply to `git archive`, if you use it. |
 
 A consumer gets every committed file, so link only to files that exist in the repository, and keep a
 provider's own agent instructions (`AGENTS.md`, `CLAUDE.md`) for work on the provider: a consumer's agent
-reads the files that its own `AGENTS.md` points at, not the scion's.
+reads the files that its own `AGENTS.md` points at, not the pattern's.
 
-### graft.nix
+### tuteur.nix
 
 A function, called once per system by the consumer's mkFlake. Its versioned contract is
-[provider/2](provider.md).
+[provider/3](provider.md).
 
 ```nix
-{ pkgs, lib, system, scion, scions, consumer, ... }:
+{ pkgs, lib, system, pattern, patterns, consumer, ... }:
 {
   requires = { knowledge-base-kit = "https://github.com/danielnaab/knowledge-base-kit"; };
   tools    = { nb-index = pkgs.writeShellApplication { … }; };
@@ -153,38 +158,40 @@ A function, called once per system by the consumer's mkFlake. Its versioned cont
 }
 ```
 
-**Arguments.** Always passed, except `kitArgs`. Take `...`, so that a later graft version can add one.
+**Arguments.** Always passed, except `kitArgs`. Take `...`, so that a later tuteur version can add one. Through
+0.1.x, graft's `scion` and `scions` are passed beside `pattern` and `patterns` ([provider/3](provider.md)), and a
+pattern with no `tuteur.nix` has its `graft.nix` read.
 
 | Argument | Value |
 |---|---|
-| `pkgs`, `lib`, `system` | The consumer's `inputs.nixpkgs` if it has one, else graft's pinned nixpkgs. |
-| `scion` | This scion, copied alone into the store, without its `.git` file. Relative paths (`./bin/tool`) resolve in it too. |
-| `scions` | Every scion of the consumer. `scions.NAME` is the scion's store path (`"${scions.NAME}/src"` works) merged with its `graft.nix` result (`scions.NAME.tools.TOOL`). |
+| `pkgs`, `lib`, `system` | The consumer's `inputs.nixpkgs` if it has one, else tuteur's pinned nixpkgs. |
+| `pattern` | This pattern, copied alone into the store, without its `.git` file. Relative paths (`./bin/tool`) resolve in it too. |
+| `patterns` | Every pattern of the consumer. `patterns.NAME` is the pattern's store path (`"${patterns.NAME}/src"` works) merged with its `tuteur.nix` result (`patterns.NAME.tools.TOOL`). |
 | `consumer` | The consumer flake's source: the repository for a top-level flake, only the flake's directory for a `path:` flake. Checks read the consumer's settings from it, such as `${consumer}/knowledge-base.yaml`, and skip, not fail, when the file is absent. |
-| `kitArgs` | The consumer's `perSystem.kitArgs.<scion>` for this scion, or `{ }`. A kit computes its requests from it, never from a file in the workspace. Passed only when the function names `kitArgs`. |
+| `kitArgs` | The consumer's `perSystem.kitArgs.<pattern>` for this pattern, or `{ }`. A kit computes its requests from it, never from a file in the workspace. Passed only when the function names `kitArgs`. |
 
 **Returned attributes.** All optional.
 
 | Attribute | Becomes | Collision |
 |---|---|---|
 | `tools` | Part of `packages.<system>.tools`, on the consumer's `PATH` | An error, unless both are the same store path. |
-| `apps` | `apps.<system>.<name>` | An error; `graft`, `sandbox`, `pot`, `pot-kits` and `graft-kits` are reserved. |
+| `apps` | `apps.<system>.<name>` | An error; `tuteur`, `graft`, `sandbox`, `pot`, `pot-kits` and `graft-kits` are reserved. |
 | `packages` | `packages.<system>.<name>` | An error; `tools`, `sandbox`, `pot`, `pot-kits` and `graft-kits` are reserved. |
-| `checks` | `checks.<system>.<scion>-<name>` | None: prefixed. |
-| `kit` | The provider's [scion kit](pot.md#schema), in `packages.<system>.pot-kits`. Its `requests` apply only when a person grants them, in their root, with `pot grant`. | None: each kit keeps its own identity. |
-| `requires` | Nothing. Checked first: each named scion must exist, or evaluation fails with `graft add URL`. | |
-| Anything else | Visible to other providers as `scions.NAME.ATTR`, not a flake output. | |
+| `checks` | `checks.<system>.<pattern>-<name>` | None: prefixed. |
+| `kit` | The provider's [pattern kit](https://github.com/danielnaab/pot/blob/v0.1.0/docs/reference/pot.md#schema), in `packages.<system>.pot-kits` when the consumer has `inputs.pot`. Its `requests` apply only when a person grants them, in their root, with `pot grant`. | None: each kit keeps its own identity. |
+| `requires` | Nothing. Checked first: each named pattern must exist, or evaluation fails with `tuteur add URL`. | |
+| Anything else | Visible to other providers as `patterns.NAME.ATTR`, not a flake output. | |
 
 - `requires` names other providers by their folder name, which is the URL's last segment, with the URL that
-  the error tells the consumer to `graft add`. It has no version. A provider that needs a newer release of a
+  the error tells the consumer to `tuteur add`. It has no version. A provider that needs a newer release of a
   sibling (one that first ships a tool it uses) releases a new major version of its own, and says so in its
   Upgrading steps. A consumer that renames a folder breaks `requires`, by design.
 - Providers ship no dev shells. A consumer's `devShells.default` has every tool on `PATH`.
-- Never read the provider's own scions from `graft.nix`: a git flake consumer has them, a `path:` flake
+- Never read the provider's own patterns from `tuteur.nix`: a git flake consumer has them, a `path:` flake
   consumer has them empty.
 - A provider's own `flake.nix` and `flake.lock` are for work on the provider. Consumers never evaluate them.
-  To pin something other than the consumer's nixpkgs, fetch it in `graft.nix` with a fixed hash
-  ([Write a provider's graft.nix](../guides/write-graft-nix.md#pin-your-own-inputs)).
+  To pin something other than the consumer's nixpkgs, fetch it in `tuteur.nix` with a fixed hash
+  ([Write a provider's tuteur.nix](../guides/write-tuteur-nix.md#pin-your-own-inputs)).
 
 ### Naming
 
@@ -197,60 +204,67 @@ A provider's name ends with what the content is, not the role that the repositor
 | `-knowledge` | A knowledge base about a topic | read it |
 
 - A repository that defines a named method takes that name, such as `living-specifications`.
-- Do not use role words (`-provider`, `-scion`), words that other tools own (`-pack`, `-bundle`,
+- Do not use role words (`-provider`, `-pattern`), words that other tools own (`-pack`, `-bundle`,
   `-template`), or words that suggest a one-time copy (`-seed`, `-starter`).
-- Give the repository the topic `graft-provider` on its forge (Forgejo or GitHub).
-- Tool names share one `PATH` across every provider a consumer grafts: start them with something of yours
+- Give the repository the topic `tuteur-provider` on its forge (Forgejo or GitHub).
+- Tool names share one `PATH` across every provider a consumer adds: start them with something of yours
   (`kb-lint`, not `lint`). App names share one namespace too. Check names are prefixed for you.
 
-## graft's workflows
+## tuteur's workflows
 
-A file in `.forgejo/workflows/` is graft's when it has the name of a file in graft's
+A file in `.forgejo/workflows/` is tuteur's when it has the name of a file in tuteur's
 `template/.forgejo/workflows/` and contains the marker line:
 
 ```yaml
-# managed by graft: https://github.com/danielnaab/graft (delete this line to keep your own edits)
+# managed by tuteur: https://github.com/danielnaab/tuteur (delete this line to keep your own edits)
 ```
 
-graft renders its own copy with the lines that are yours: `branches:`, `paths-ignore` and `# graft ssh:`
+tuteur renders its own copy with the lines that are yours: `branches:`, `paths-ignore` and `# tuteur ssh:`
 (with the steps that it implies). The file must equal that rendering byte for byte.
 
-- `upgrade` replaces the file when graft's pin moves.
+- `upgrade` replaces the file when tuteur's pin moves.
 - `sync` restores the pinned version's copy.
 - `check` fails if the file differs.
-- To keep your own edits, delete the marker line. graft then never reads or changes the file
+- To keep your own edits, delete the marker line. tuteur then never reads or changes the file
   ([Keep your own edits to a workflow](#keep-your-own-edits-to-a-workflow)).
-- graft never adds a workflow that you did not copy in.
+- tuteur never adds a workflow that you did not copy in.
+- graft's workflows, `graft-check.yaml`, `graft-upgrade.yaml` and `graft-signers.yaml` with graft's marker
+  (`# managed by graft: …`), are tuteur's to rename through 0.1.x: `sync` moves each to its `tuteur-` name, then
+  renders it with the lines that are yours (`tuteur: renamed .forgejo/workflows/graft-check.yaml to
+  .forgejo/workflows/tuteur-check.yaml`); `check` names one that is still there. The workflow's name, and so its
+  status context, changes too (`tuteur-check / patterns`): edit a branch rule that requires `graft-check / …`.
 
 The workflows find the flake from the marker README: its directory's parent; two marker READMEs fail with
-`::error::two scions directories: … graft supports one per repository`. A flake in a subdirectory runs as
-`path:$PWD/DIR`, and the check and upgrade jobs first fill its scions (`git submodule update -q --init -- DIR`),
+`::error::two patterns folders: … tuteur supports one per repository`. A flake in a subdirectory runs as
+`path:$PWD/DIR`, and the check and upgrade jobs first fill its patterns (`git submodule update -q --init -- DIR`),
 because a `path:` flake reads the working tree. A top-level git flake does not need that: Nix fetches the
-scions itself. graft-check's step is named `Scions registered and at release tags`.
+patterns itself. tuteur-check's job is `patterns`, and its step is named `Patterns registered and at release tags`.
+The workflows also find graft's marker README, through 0.1.x. tuteur-upgrade's pull request step reads the token
+`secrets.TUTEUR_PR_TOKEN || secrets.GRAFT_PR_TOKEN || github.token`, and pushes the branch `tuteur/upgrade`.
 
-`graft-signers.yaml` (since v2.21.0) runs [`ci signers`](commands.md#ci) on each push to the default branch and
-each tag: report-only, it never fails. Its `branches:` line is yours, as graft-check's is; its step that runs
-graft is `Signers (report-only)`. It needs `.forgejo/allowed_signers` in the repository: an ssh
+`tuteur-signers.yaml` (since graft v2.21.0) runs [`ci signers`](commands.md#ci) on each push to the default branch and
+each tag: report-only, it never fails. Its `branches:` line is yours, as tuteur-check's is; its step that runs
+tuteur is `Signers (report-only)`. It needs `.forgejo/allowed_signers` in the repository: an ssh
 `allowed_signers` file whose principals are `daniel@person`, `daniel@routine` and `agent@HOST`.
 
 ### Keep your own edits to a workflow
 
-1. Delete the marker line. Do this before you run `nix run .#graft sync`: while the marker is there, sync puts
-   graft's copy back.
-2. Make your edits. The comment below the old marker still says that graft replaces the file: change it
+1. Delete the marker line. Do this before you run `nix run .#tuteur sync`: while the marker is there, sync puts
+   tuteur's copy back.
+2. Make your edits. The comment below the old marker still says that tuteur replaces the file: change it
    too.
-3. Run `nix run .#graft check`. It no longer reads the file.
+3. Run `nix run .#tuteur check`. It no longer reads the file.
 4. Commit the workflow.
 
-Without the marker, `upgrade` no longer replaces the file, so you get none of graft's later changes to it.
-To take graft's copy again, put the marker line back as the first line and run `nix run .#graft sync`. It
-prints `graft: refreshed .forgejo/workflows/FILE`, keeps the `branches:`, `paths-ignore:` and `# graft ssh:`
-lines, and drops your other edits. graft does not stage the workflows, so `git restore` gets back an edit that
+Without the marker, `upgrade` no longer replaces the file, so you get none of tuteur's later changes to it.
+To take tuteur's copy again, put the marker line back as the first line and run `nix run .#tuteur sync`. It
+prints `tuteur: refreshed .forgejo/workflows/FILE`, keeps the `branches:`, `paths-ignore:` and `# tuteur ssh:`
+lines, and drops your other edits. tuteur does not stage the workflows, so `git restore` gets back an edit that
 git had.
 
 ### The branches line
 
-One line under the `push:` trigger of `graft-check.yaml`: the branches whose pushes run the check. graft's
+One line under the `push:` trigger of `tuteur-check.yaml`: the branches whose pushes run the check. tuteur's
 copy has `branches: [main]`. If your default branch has another name, write it there:
 
 ```yaml
@@ -263,8 +277,8 @@ A list of branch names on one line, with no comment after it. Names can contain 
 
 ### The paths-ignore line
 
-One line under each of the `pull_request:` and `push:` triggers of `graft-check.yaml`, the same under both.
-It skips graft-check for pushes that change only files that graft's check never reads, such as a notes
+One line under each of the `pull_request:` and `push:` triggers of `tuteur-check.yaml`, the same under both.
+It skips tuteur-check for pushes that change only files that tuteur's check never reads, such as a notes
 directory that a bot pushes to often:
 
 ```yaml
@@ -281,40 +295,41 @@ on:
   every changed file matches a glob.
 - A block list, or two lines that differ, fail the check. If the line is under one trigger only, `sync`
   writes it under the other.
-- graft refuses a glob that could match a file that graft-check reads: the scions directory, `.gitmodules`,
+- tuteur refuses a glob that could match a file that tuteur-check reads: the patterns folder, `.gitmodules`,
   `flake.nix`, `flake.lock` (for a flake in a subdirectory, that whole directory) and `.forgejo/`. It also
   refuses a glob that starts with `*` or `/`. Name a directory.
-- A pull request that changes only ignored files gets no graft-check status. Do not make that status
+- A pull request that changes only ignored files gets no tuteur-check status. Do not make that status
   required in branch protection.
 
-### The graft ssh line
+### The tuteur ssh line
 
-One comment line, for a private scion that only an ssh key can read
-([Graft a private repository](../guides/private-providers.md)), in either workflow file. graft keeps it above
-`name:`, and renders a step that installs the key before each step that runs graft: graft-check's check, and
-graft-upgrade's upgrade and pr steps. In a file whose copy has no such step, the check fails with
-`graft: X: its "# graft ssh:" line is kept only in a workflow with a step that runs graft, and this graft version's copy has none; delete the line`.
+One comment line, for a private pattern that only an ssh key can read. graft's form, `# graft ssh: …`, is read
+through 0.1.x, and `sync` writes it as `# tuteur ssh: …`
+([Add a private provider](../guides/private-providers.md)), in either workflow file. tuteur keeps it above
+`name:`, and renders a step that installs the key before each step that runs tuteur: tuteur-check's check, and
+tuteur-upgrade's upgrade and pr steps. In a file whose copy has no such step, the check fails with
+`tuteur: X: its "# tuteur ssh:" line is kept only in a workflow with a step that runs tuteur, and this tuteur version's copy has none; delete the line`.
 
 ```yaml
-# graft ssh: host=[git.example.com]:2222 address=192.168.1.51 hostkey=ssh-rsa AAAAB3NzaC1yc2E... secret=GRAFT_SSH_KEY
+# tuteur ssh: host=[git.example.com]:2222 address=192.168.1.51 hostkey=ssh-rsa AAAAB3NzaC1yc2E... secret=TUTEUR_SSH_KEY
 ```
 
 | Field | Required | Meaning |
 |---|---|---|
-| `host` | yes | The host as the scion's URL names it; `[host]:port` when the port is not 22. |
+| `host` | yes | The host as the pattern's URL names it; `[host]:port` when the port is not 22. |
 | `address` | no | The address that the host name resolves to, for a runner that cannot resolve it. |
 | `hostkey` | yes | The host's public key, `TYPE KEY`, where `TYPE` is `ssh-ed25519`, `ssh-rsa` or `ecdsa-sha2-nistp256` (or `384`, `521`). Pinned: `StrictHostKeyChecking yes`. For Forgejo's built-in ssh server, `data/ssh/gitea.rsa.pub`. |
-| `secret` | no | The Actions secret that holds the private key. Default `GRAFT_SSH_KEY`. |
+| `secret` | no | The Actions secret that holds the private key. Default `TUTEUR_SSH_KEY`, else graft's `GRAFT_SSH_KEY` (`secrets.TUTEUR_SSH_KEY \|\| secrets.GRAFT_SSH_KEY`). |
 
-The step writes the key to `~/.ssh/graft_scions`, the host key to `~/.ssh/known_hosts` (under the host name
+The step writes the key to `~/.ssh/tuteur_patterns`, the host key to `~/.ssh/known_hosts` (under the host name
 and the address), and a `Host` entry to `~/.ssh/config`, which both git and Nix's git fetcher read. On an
 image with no ssh client, it takes `openssh` from Nix.
 
 ## Sources
 
 - [lib/common.sh](../../lib/common.sh): finding the marker README; semver tags
-- [lib/mk-flake.nix](../../lib/mk-flake.nix): the `graft.nix` arguments, merging and collisions, `kit`
-- [provider/2](provider.md): the `graft.nix` contract
+- [lib/mk-flake.nix](../../lib/mk-flake.nix): the `tuteur.nix` arguments, merging and collisions, `kit`
+- [provider/3](provider.md): the `tuteur.nix` contract
 - [lib/workflows.sh](../../lib/workflows.sh): workflow ownership, the branches, paths-ignore and ssh lines
 - [lib/tools.sh](../../lib/tools.sh): `add`, `upgrade` and `.gitmodules`
 - [lib/common.sh](../../lib/common.sh) `upstream_range`, `changelog_between`: `CHANGELOG.md` read from the

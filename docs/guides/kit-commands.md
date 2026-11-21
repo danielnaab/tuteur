@@ -1,95 +1,101 @@
 ---
 status: working
 ---
-# Declare kit commands, recipes and hook commands
+# Declare kit commands
 
-A provider's kit declares the programs it ships as `commands`. From graft v2.18.0, each consumer's tools hold a
-**wrapper** of the same name, so `pot` runs your command under its own policy: on the host, from `just`, from a git
-hook, and beside an agent's run, as a sibling the host starts (v2.20.0). The wrapped command gets only what it
-requests and the repo kit's reach, never the agent's token or MCP, nor the context's standing reach. This page is for a provider; the consumer's side is [Move to v2.18.0](move-to-v2-18.md).
+A provider's `tuteur.nix` may return a `kit` for [pot](https://github.com/danielnaab/pot), which runs agents and
+commands in a sandbox: the commands it ships, the recipes that run them, a hook command, and what they ask to
+reach. tuteur hands the kit to pot unread; what a kit may say, and how pot runs it, is pot's
+([pot's guide: Declare kit commands](https://github.com/danielnaab/pot/blob/v0.1.0/docs/guides/kit-commands.md),
+[kit/1](https://github.com/danielnaab/pot/blob/v0.1.0/contracts/kit-1.md)). This page is tuteur's half: the
+provider's wiring, and the consumer's.
 
 ## Before you begin
 
-- Your provider has a `graft.nix` with `tools` ([Write a provider's graft.nix](write-graft-nix.md)).
-- `recipes` in the attrs form and `hook` are kit 1.2. pot reads 1.2 from v2.17.0, so write it once your consumers'
-  roots are on v2.17.0 or later. Wrappers appear once a consumer takes graft v2.18.0; under an older root they run
-  the program unwrapped, with one line on stderr ([Wrapped commands](../reference/pot.md#wrapped-commands)).
+- Your provider has a `tuteur.nix` with `tools` ([Write a provider's tuteur.nix](write-tuteur-nix.md)).
+- A consumer gets your kit only when its flake takes pot as an input of its own (`inputs.pot`). Without it,
+  mkFlake builds no `pot-kits`, the tools are not wrapped, there is no `kits.just`, and the consumer's build
+  prints one warning that names your `tuteur.nix`.
 
 ## Steps
 
-1. Declare each program as a command, with the least `access` it needs and no `requests` unless it reaches
-   something outside the workspace and the store. A kit with no requests needs no grant: it runs with no prompt.
+1. In the provider, return the kit from `tuteur.nix`, beside the tools it names:
 
    ```nix
-   # graft.nix (notebook-kit's, trimmed)
-   kit = {
-     version = "1.2";
-     commands = {
-       check-kb = { program = lib.getExe scripts.check-kb; access = "read";
-                    description = "Check links, lifecycle status, and Sources"; };
-       nb-index = { program = lib.getExe scripts.nb-index; access = "write"; };
-       nb-pre-commit = { program = lib.getExe preCommit; access = "read"; hook = "pre-commit";
-                         description = "markdownlint on staged Markdown, then check-kb"; };
+   # tuteur.nix (notebook-kit's, trimmed)
+   { pkgs, lib, ... }:
+   let check-kb = pkgs.writeShellApplication { name = "check-kb"; text = "…"; }; in
+   {
+     tools.check-kb = check-kb;
+     kit = {
+       version = "1.2";
+       commands.check-kb = { program = lib.getExe check-kb; access = "read";
+                             description = "Check links, lifecycle status, and Sources"; };
+       recipes.check-kb = { run = "check-kb"; description = "Check links, lifecycle status, and Sources"; };
      };
-     recipes = {
-       check-kb = { run = "check-kb"; description = "Check links, lifecycle status, and Sources"; };
-       index = { run = "nb-index"; description = "Rebuild the indexes"; };
-     };
-   };
+   }
    ```
 
-   `program` is a file in the store (`lib.getExe drv`), not a package. A recipe's `run` starts with one of the
-   kit's own commands; the rest are literal words (letters, digits and `. _ / = : , @ + % -`, one space apart). A
-   recipe's name is letters, digits, `_` and `-`, starting with a letter.
+   A kit that reads the consumer's settings takes `kitArgs` (the consumer's `perSystem.kitArgs.<pattern>`):
+   name it in the function's arguments ([provider/3](../reference/provider.md)).
 
-2. Make a hook command call other programs by store path, not through `just` or another wrapper, so one commit
-   is one sandbox start: put them in the hook script's `runtimeInputs`.
+2. In a consumer that runs under pot, take pot, and lock it:
 
-3. Try it in a consumer: `graft try` in the consumer, then `nix run .#graft sync` there. Check:
-   - `head -3 "$(nix build --no-link --print-out-paths .#tools)/bin/check-kb"` is a wrapper (a comment names pot-kits/1);
-   - `just --list` shows the generated recipes, from `<scions>/kits.just`;
-   - `pot explain claude` lists your commands on its `children` row as `sibling`.
+   ```nix
+   inputs.pot.url = "github:danielnaab/pot/v0.1.0";
+   ```
 
-4. Release a minor version: a new field, nothing removed.
+   ```
+   XDG_CACHE_HOME=$(mktemp -d) nix flake update pot
+   ```
 
-## Keep older consumers working
+   mkFlake then calls `inputs.pot.lib.pot.kitsFor` ([pot-lib/1](https://github.com/danielnaab/pot/blob/v0.1.0/contracts/pot-lib-1.md))
+   with every kit, and gives `packages.<system>.pot-kits`. `tuteur upgrade` moves `pot` with tuteur's own pin,
+   by the same rule.
 
-- Keep your hand-written `.just` file and hook script while consumers on older graft use them. A consumer on
-  v2.18.0 imports it first and `kits.just` after; with `set allow-duplicate-recipes`, just keeps the first of two recipes with one name, so your
-  hand-written one runs. Make it call the tool from the consumer's `tools`, so it runs the same wrapper.
-- Another provider's Nix uses your unwrapped tools, `scions.<name>.tools.<tool>`, as before. Never call a
-  wrapper from a Nix build or a check.
+3. To run the kits' recipes with `just`, import the generated file from the consumer's `justfile`, then write it:
+
+   ```just
+   set allow-duplicate-recipes
+   import? ".patterns/kits.just"
+   tools := `nix build --no-link --print-out-paths .#tools`
+   ```
+
+   ```
+   nix run .#tuteur sync
+   ```
+
+   It prints `tuteur: wrote .patterns/kits.just`. Commit the file: `tuteur check` compares it with what the flake
+   generates ([kits.just](../reference/files.md#kitsjust)).
+
+4. Release the provider: a new field in a kit is a patch or minor release of yours, nothing removed.
 
 ## Check it worked
 
-- On the host, `check-kb` in the consumer runs quietly; `pot runs --all` lists it (plain `pot runs` hides wrapped
-  runs that exited 0).
-- Inside `pot claude`, the same command is a sibling: it cannot reach the agent's hosts, and the agent waits for it
-  and gets its exit code.
-- `git commit` in the consumer runs your hook command.
-- On macOS, the command runs under Seatbelt, on the host and as a sibling alike. A row that needs reach the run
-  lacks is refused, naming your recipe (`run it on the host (just check-kb)`), so keep the recipe's name meaningful.
-- A sibling's standard input and output are the caller's terminal or pipes; a file redirected into it arrives
-  through a pipe. Its `/tmp` is its own: don't hand it the caller's temporary files.
+```
+nix build --no-link --print-out-paths .#pot-kits
+just --list
+nix run .#tuteur check
+```
+
+`pot-kits` builds, `just --list` shows your recipes, and `check` passes. In a run, `pot explain` lists your kit.
 
 ## If something goes wrong
 
-- **`pot: FILE: recipes.N: runs X, which is not one of this kit's commands (A, B)`.** Declare `X` as a command,
-  or point the recipe at one.
-- **`pot: FILE: recipes.N: literal words only (letters, digits and . _ / = : , @ + % -, one space apart)`.** A recipe passes the caller's
-  arguments itself (`"$@"`); write only fixed words.
-- **`pot: FILE: recipes.N: a recipe's name is letters, digits, _ and - (starting with a letter)`.** Rename it.
-- **`graft: scions/kits.just's recipe X has the name of the justfile's own X: …`** (in a consumer). A kit's recipe
-  never replaces the consumer's own; one of the two is renamed.
-- **`… needs X, which this run (claude) lacks: run it on the host (just RECIPE)`.** Your command requests reach
-  the agent's run lacks. Drop the request if it is not needed; otherwise that command runs on the host only.
-- **`pot: kitsFor: two recipes are named X (FILE and FILE)`,** or `two kits ship a command named X (self and
-  scions.a): a wrapper has one name`. Two kits in the consumer use one name. Rename yours.
-- **`pot: kitsFor: a command name is letters, digits, . _ and - (X)`.** Rename the command.
+- **A warning that a unit `declares a kit for pot, but this flake has no inputs.pot`.** The consumer has no
+  `inputs.pot`: add it (step 2) if agents or kit commands run there. Otherwise the kit is unused, and the warning
+  is harmless.
+- **`tuteur: .patterns/kits.just is here but this flake has no pot-kits (no inputs.pot): add inputs.pot, or remove
+  the file`.** The same, for a consumer that has a `kits.just`.
+- **`tuteur: .patterns/kits.just's recipe X has the name of the justfile's own X: …`.** A kit's recipe never
+  replaces the consumer's own; rename one of the two.
+- **`pot: …` while `pot-kits` builds.** pot's check of the kit: see pot's guide.
+- **``tuteur: FILE gives `sandbox`: graft v2.15.0 replaced it with `kit` ``.** Give `kit` instead.
 
 ## Sources
 
-- [kit/1](../../pot/contracts/kit-1.md): `commands`, `recipes`, `hook`
-- [pot-kits/1](../../pot/contracts/pot-kits-1.md): the wrapper, `kits.just`, the manifests
-- [pot/lib/kits-for.nix](../../pot/lib/kits-for.nix): what kitsFor builds
-- [pot's reference: Wrapped commands](../reference/pot.md#wrapped-commands)
+- [lib/mk-flake.nix](../../lib/mk-flake.nix): `inputs.pot`, the kits handed to `kitsFor`, the warning, the
+  reserved names
+- [lib/common.sh](../../lib/common.sh), [lib/patterns.sh](../../lib/patterns.sh): `kits.just` in `sync`, `add`,
+  `upgrade` and `check`
+- `tests/run.sh`, section `kits`
