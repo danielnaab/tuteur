@@ -36,14 +36,18 @@
     "pot": {
       "flake": false,
       "locked": {
-        "lastModified": 1795297894,
-        "narHash": "sha256-LlbJUv9HXNsMcZf67k3AguJJue0K+XKsRItGB/R+Ppc=",
-        "path": "/home/daniel/src/pot",
-        "type": "path"
+        "lastModified": 1795297241,
+        "narHash": "sha256-sRqAXJ4X9puQbeBouOd1UkZ5ujq/TfPTlxMY00VxX9g=",
+        "owner": "danielnaab",
+        "repo": "pot",
+        "rev": "46d7b2aca585a101b184771221145f26062429d1",
+        "type": "github"
       },
       "original": {
-        "path": "/home/daniel/src/pot",
-        "type": "path"
+        "owner": "danielnaab",
+        "ref": "v0.1.0",
+        "repo": "pot",
+        "type": "github"
       }
     },
     "root": {

@@ -12,7 +12,7 @@
   # pot, for tests/run.sh `kits` (mkFlake's half of the seam: a test consumer takes it as inputs.pot). Source
   # only here: the test consumer evaluates its flake, this one never does. At a release, pot's tag:
   #   github:danielnaab/pot/v0.1.0
-  inputs.pot = { url = "path:/home/daniel/src/pot"; flake = false; };
+  inputs.pot = { url = "github:danielnaab/pot/v0.1.0"; flake = false; };
 
   outputs = { nixpkgs, knowledge-base-kit, ... }:
     let
