@@ -375,7 +375,9 @@ cmd_check() {
   fi
   # kits.just (v2.18.0): the bytes the flake's kits generate, where the repository uses it
   if [ -z "$committed" ] && [ -n "${GRAFT_IN_REPO:-}" ] && [ "$rc" = 0 ] && kits_just_wanted; then
-    if ! lt=$(kits_just_text 2>"$GRAFT_TMP/kj.err"); then
+    if ! has_pot_kits; then
+      [ ! -e "$SCIONS/kits.just" ] || bad "$SCIONS/kits.just is here but this flake has no pot-kits (no inputs.pot): add inputs.pot, or remove the file"
+    elif ! lt=$(kits_just_text 2>"$GRAFT_TMP/kj.err"); then
       tail -5 "$GRAFT_TMP/kj.err" >&2
       bad "$SCIONS/kits.just: the flake's pot-kits doesn't evaluate (above)"
     elif [ -L "$SCIONS/kits.just" ]; then

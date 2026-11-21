@@ -130,10 +130,22 @@ kits_just_text() {
   nix_ eval --raw "$FLAKE_REF#packages.$system.pot-kits.kitsJust"
 }
 
+# has_pot_kits: whether the flake has packages.<system>.pot-kits: mkFlake gives it only when the consumer takes pot
+# as an input of its own (inputs.pot)
+has_pot_kits() {
+  local system
+  system=$(nix_ eval --impure --raw --expr builtins.currentSystem) || return 1
+  [ "$(nix_ eval --json "$FLAKE_REF#packages.$system" --apply 'p: p ? pot-kits' 2>/dev/null)" = true ]
+}
+
 # kits_just_write: graft sync's and upgrade's step: write SCIONS/kits.just when it is wanted and differs
 kits_just_write() {
   local want
   kits_just_wanted || return 0
+  if ! has_pot_kits; then
+    echo "graft: $SCIONS/kits.just: this flake has no pot-kits (no inputs.pot); not written" >&2
+    return 0
+  fi
   if ! want=$(kits_just_text 2>"$GRAFT_TMP/kj.err"); then
     tail -3 "$GRAFT_TMP/kj.err" >&2
     echo "graft: $SCIONS/kits.just: the flake's pot-kits doesn't evaluate (above); left as it is" >&2

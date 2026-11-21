@@ -46,13 +46,18 @@
 # whatever state the scions are in; pot-kits, like the tools, fails on a failing provider. An
 # empty scion (a path: flake's fresh clone; a private one left uninitialised) fails only what uses
 # it (scions.<name>); the tools leave its own out, with a warning.
-{ nixpkgs, systems, cli, kitsFor }:
+{ nixpkgs, systems, cli }:
 
 { inputs, dir ? "scions", perSystem ? null, outputs ? { } }:
 
 let
   lib = nixpkgs.lib;
   src = inputs.self;
+  # pot's library (contract pot-lib/1), when the consumer takes pot as an input of its own (inputs.pot): tuteur
+  # depends on nothing of pot's. Without it there is no pot-kits, the tools are not wrapped and there is no
+  # kits.just; a unit that declares a kit gets one warning
+  kitsFor = inputs.pot.lib.pot.kitsFor or null;
+  hasPot = kitsFor != null;
   # the first line of the scions README (lib/graft.sh writes it); also lib/common.sh's MARKER
   marker = "<!-- managed by graft: https://github.com/danielnaab/graft -->";
 
@@ -189,7 +194,7 @@ let
         else warnEmpty (pkgs.buildEnv { name = "tools"; paths = lib.attrValues tools; }));
       # v2.18.0 (D4): each kit command's wrapper over the tool of the same name, so pot runs kit code under its
       # own policy; passthru.unwrapped is the tools as before, for Nix consumers and a worker that runs no pot
-      toolsEnv = ok (builtins.seq toolsUnwrapped.drvPath pkgs.buildEnv {
+      toolsEnv = if !hasPot then warnKits toolsUnwrapped else ok (builtins.seq toolsUnwrapped.drvPath pkgs.buildEnv {
         name = "tools";
         paths = lib.attrValues tools ++ [ (lib.hiPrio potKits.wrappers) ];
         passthru.unwrapped = toolsUnwrapped;
@@ -203,13 +208,18 @@ let
       kitUnits = lib.filterAttrs (_: v: v != null) (lib.genAttrs units (n:
         let k = ctx n (kitOf n); in if k == null then null else { kit = k; file = kitFile n; }));
       graftForRepo = cli pkgs { GRAFT_DIR = dir; GRAFT_IN_REPO = "1"; };
+      # no inputs.pot: the kits go nowhere, said once (on the tools, which every repo builds)
+      warnKits = x: if kitUnits == { } then x
+        else lib.warn ("tuteur: ${lib.concatMapStringsSep ", " kitFile (lib.attrNames kitUnits)} declare${lib.optionalString (lib.length (lib.attrNames kitUnits) == 1) "s"} a kit for pot, "
+          + "but this flake has no inputs.pot: no packages.<system>.pot-kits, so no run applies ${if lib.length (lib.attrNames kitUnits) == 1 then "it" else "them"}; "
+          + "add inputs.pot.url = \"github:danielnaab/pot/v0.1.0\"; to use pot") x;
       potKits = ok (kitsFor {
         inherit pkgs;
         self = kitUnits.self or null;
         scions = removeAttrs kitUnits [ "self" ];
         tools = lib.attrValues tools ++ [ graftForRepo ];
         # graft's own files: every provider's graft.nix and the scions directory are read-only in a run
-        files = [ "**/graft.nix" dir ];
+        files = [ "**/tuteur.nix" "**/gr@ft.nix" dir ];
         # graft's own recipes, in the same kits.just as the kits' (v2.18.0)
         recipes = {
           outdated = { run = "graft outdated"; description = "Show the pinned and newest tag of each scion"; };
@@ -225,7 +235,7 @@ let
       # first, so its names must evaluate for the repo's own outputs (and apps.graft) to; the tools
       # (strict) fail on the provider instead
       packages = removeAttrs (merge keysOf "packages") [ "tools" "pot-kits" "graft-kits" "sandbox" "pot" ]
-        // { tools = toolsEnv; pot-kits = potKits; };
+        // { tools = toolsEnv; } // lib.optionalAttrs hasPot { pot-kits = potKits; };
       apps = removeAttrs (merge keysOf "apps") [ "graft" "sandbox" "pot" "pot-kits" "graft-kits" ];
       checks = lib.foldl' (acc: n:
         acc // lib.listToAttrs (map (k: lib.nameValuePair (if n == "self" then k else "${n}-${k}")
@@ -263,7 +273,8 @@ let
 in
 merged // {
   apps = (merged.apps or { }) // lib.genAttrs systems (s: lib.mapAttrs (_: noReserved) (merged.apps.${s} or { }) // graftApps s);
-  packages = (merged.packages or { }) // lib.genAttrs systems (s: lib.mapAttrs (_: noReserved) (merged.packages.${s} or { }) // {
-    pot-kits = own s "packages" "pot-kits" bySystem.${s}.packages.pot-kits;
-  });
+  packages = (merged.packages or { }) // lib.genAttrs systems (s: lib.mapAttrs (_: noReserved) (merged.packages.${s} or { })
+    // lib.optionalAttrs (hasPot || outputs ? packages.${s}.pot-kits) {
+      pot-kits = own s "packages" "pot-kits" (bySystem.${s}.packages.pot-kits or null);
+    });
 }
