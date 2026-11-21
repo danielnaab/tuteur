@@ -416,7 +416,7 @@ cmd_check() {
 # mkFlake reports (the folder found by graft's default name, a provider's graft.nix, the arguments scion and
 # scions). The input name graft is read through 0.x, so it gets no line.
 aliases_in_use() {
-  local f system
+  local f system json t w
   [ "${TUTEUR_VIA:-}" != graft ] || alias_line "the app graft (nix run .#graft)" "run nix run .#tuteur (tuteur sync renames graft's workflows, which run the old name)"
   if [ -n "$PATTERNS" ] && grep -qsF -- "$OLD_MARKER" "$PATTERNS/README.md"; then
     alias_line "the marker in $PATTERNS/README.md" "tuteur sync rewrites it"
@@ -427,8 +427,11 @@ aliases_in_use() {
   done
   if [ -n "${TUTEUR_IN_REPO:-}" ] && [ -n "$PATTERNS" ]; then
     system=$(nix_ eval --impure --raw --expr builtins.currentSystem) || return 0
-    nix_ eval --json "$FLAKE_REF#packages.$system.tools.passthru.tuteurAliases" 2>/dev/null \
-      | jq -r '.[] | "\(.thing)\t\(.todo)"' 2>/dev/null | while IFS=$'\t' read -r t w; do alias_line "$t" "$w"; done
+    # (a flake whose tools mkFlake did not make has none)
+    json=$(nix_ eval --json "$FLAKE_REF#packages.$system.tools.passthru.tuteurAliases" 2>/dev/null) || json='[]'
+    while IFS=$'\t' read -r t w; do
+      [ -z "$t" ] || alias_line "$t" "$w"
+    done < <(jq -r '.[]? | "\(.thing)\t\(.todo)"' <<<"$json" 2>/dev/null || true)
   fi
   return 0
 }

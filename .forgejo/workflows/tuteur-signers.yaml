@@ -56,7 +56,7 @@ jobs:
         run: |
           # tuteur's flake, found as tuteur-check finds it
           rs=$(git grep -l -F -e '<!-- managed by tuteur: https://github.com/danielnaab/tuteur -->' -e '<!-- managed by graft: https://github.com/danielnaab/graft -->' -- '*/README.md' || true)
-          case $rs in *$'\n'*) echo "::warning::two patterns directories:" $rs; exit 0 ;; esac
+          case $rs in *$'\n'*) echo "::warning::two patterns folders:" $rs; exit 0 ;; esac
           sd=${rs%/README.md} fd=. flake=.
           if [[ $sd == */* ]]; then fd=${sd%/*}; fi
           if [ "$fd" != . ]; then

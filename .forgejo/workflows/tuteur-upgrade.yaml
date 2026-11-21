@@ -50,11 +50,11 @@ jobs:
       - name: Upgrade, check the result, push it to tuteur/upgrade
         id: upgrade
         run: |
-          # tuteur's flake: beside the patterns directory, the one folder whose README.md carries tuteur's
+          # tuteur's flake: beside the patterns folder, the one folder whose README.md carries tuteur's
           # marker (or graft's; git grep doesn't look inside submodules), or the top when there is none yet.
           # Bash and git only: the nixos/nix image has no sed.
           rs=$(git grep -l -F -e '<!-- managed by tuteur: https://github.com/danielnaab/tuteur -->' -e '<!-- managed by graft: https://github.com/danielnaab/graft -->' -- '*/README.md' || true)
-          case $rs in *$'\n'*) echo "::error::two patterns directories:" $rs "tuteur supports one per repository"; exit 1 ;; esac
+          case $rs in *$'\n'*) echo "::error::two patterns folders:" $rs "tuteur supports one per repository"; exit 1 ;; esac
           sd=${rs%/README.md} fd=. flake=.
           if [[ $sd == */* ]]; then fd=${sd%/*}; fi
           if [ "$fd" != . ]; then
@@ -100,11 +100,11 @@ jobs:
           # all your repos under Settings > Actions > Secrets), opens the PR as that user.
           PR_TOKEN: ${{ secrets.TUTEUR_PR_TOKEN || secrets.GRAFT_PR_TOKEN || github.token }}
         run: |
-          # tuteur's flake: beside the patterns directory, the one folder whose README.md carries tuteur's
+          # tuteur's flake: beside the patterns folder, the one folder whose README.md carries tuteur's
           # marker (or graft's; git grep doesn't look inside submodules), or the top when there is none yet.
           # Bash and git only: the nixos/nix image has no sed.
           rs=$(git grep -l -F -e '<!-- managed by tuteur: https://github.com/danielnaab/tuteur -->' -e '<!-- managed by graft: https://github.com/danielnaab/graft -->' -- '*/README.md' || true)
-          case $rs in *$'\n'*) echo "::error::two patterns directories:" $rs "tuteur supports one per repository"; exit 1 ;; esac
+          case $rs in *$'\n'*) echo "::error::two patterns folders:" $rs "tuteur supports one per repository"; exit 1 ;; esac
           sd=${rs%/README.md} fd=. flake=.
           if [[ $sd == */* ]]; then fd=${sd%/*}; fi
           if [ "$fd" != . ]; then
