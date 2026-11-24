@@ -2,7 +2,7 @@
 # tuteur's signer check, report-only: who signed each commit a push brings to the default branch, and each
 # tag, against the repo's .forgejo/allowed_signers (principals daniel@person, daniel@routine, agent@HOST).
 # An agent's signature needs a Pot-Run: trailer; grants, the signers file and agent instructions need a
-# @person key; a tag needs @person or @routine. It never fails: findings are warnings in the job's log.
+# @person key. Tags report the verified signer (any class) and forge push actor, not release permission.
 # Copy to .forgejo/workflows/. The step itself is `nix run .#tuteur ci signers` (tuteur's lib/ci.sh)
 # at the tuteur version the repo pins, and `tuteur upgrade` replaces this file with the copy each new
 # version ships, as long as the line above is here.
@@ -52,6 +52,7 @@ jobs:
           REF: ${{ github.ref }}
           BEFORE: ${{ github.event.before }}
           AFTER: ${{ github.ref }}
+          PUSH_ACTOR: ${{ github.event.sender.login || github.actor }}
           SIGNERS_REF: refs/tuteur/signers
         run: |
           # tuteur's flake, found as tuteur-check finds it

@@ -267,7 +267,7 @@ pr() {
 #   - an agent@ signature carries a Pot-Run: trailer;
 #   - a change to a protected path ($TUTEUR_SIGNERS_PERSON: shell patterns, where * also matches /) is signed by
 #     a @person key.
-# A tag: annotated and signed by @person or @routine (for now: tags from the phone use the routine key).
+# A tag: report the peeled target, verified SSH principal (any class) and PUSH_ACTOR from the forge separately.
 # (graft's names, GRAFT_SIGNERS_*, are read when the new ones are not set: through 0.1.x)
 TUTEUR_SIGNERS_FILE=${TUTEUR_SIGNERS_FILE:-${GRAFT_SIGNERS_FILE:-.forgejo/allowed_signers}}
 TUTEUR_SIGNERS_PERSON=${TUTEUR_SIGNERS_PERSON:-${GRAFT_SIGNERS_PERSON:-"grants.json */grants.json .forgejo/allowed_signers AGENTS.md */AGENTS.md CLAUDE.md */CLAUDE.md .claude/* */.claude/* .pi/* */.pi/*"}}
@@ -317,20 +317,28 @@ signers_report() {
   local g=(git -c "gpg.ssh.allowedSignersFile=$file" -c core.hooksPath=/dev/null -c core.fsmonitor=false)
 
   if [[ $ref == refs/tags/* ]]; then
-    local tag=${ref#refs/tags/} out who cls
+    local tag=${ref#refs/tags/} target out who="" signature
+    target=$(git rev-parse --short=12 "$after^{}") || target=unknown
     if [ "$(git cat-file -t "$after")" != tag ]; then
+      signature="lightweight (no tag signature)"
       find_ "tag $tag is lightweight: a release tag is annotated and signed (git tag -s)"
     else
-      out=$("${g[@]}" verify-tag "$after" 2>&1)
-      who=$(sed -n 's/^Good "git" signature for \(.*\) with .* key .*/\1/p' <<<"$out" | head -1)
-      cls=$(signers_class "$who")
-      if [ -z "$who" ]; then
+      # Never credit a principal from the tagger field or a failed verification's output.
+      if out=$(LC_ALL=C "${g[@]}" verify-tag "$after" 2>&1); then
+        who=$(sed -n 's/^Good "git" signature for \(.*\) with .* key .*/\1/p' <<<"$out" | head -1)
+      fi
+      if [ -n "$who" ]; then
+        signature="signed by $who"
+      elif [ "$out" = 'error: no signature found' ]; then
+        signature="unsigned"
+        find_ "tag $tag is annotated but unsigned"
+      else
+        signature="unverified"
         find_ "tag $tag: no signature that verifies against $TUTEUR_SIGNERS_FILE"
-      elif [ "$cls" != person ] && [ "$cls" != routine ]; then
-        find_ "tag $tag is signed by $who: a tag needs a @person or @routine key"
       fi
     fi
-    echo "tuteur: signers: tag $tag, $findings finding(s)$note (report-only)"
+    printf 'tuteur: signers: tag %s -> %s; %s; pushed by %s; %d finding(s)%s (report-only)\n' \
+      "$(clean "$tag")" "$target" "$(clean "$signature")" "$(clean "${PUSH_ACTOR:-unknown}")" "$findings" "$(clean "$note")"
     return 0
   fi
 

@@ -1166,8 +1166,12 @@ sec_ci() {
   refused "ci check: a flake.lock never committed" nix run .#tuteur -- ci check
   expect "says so" holds "tuteur: flake.lock is not committed, so nothing is pinned"
 
-  # ci signers (v2.21.0, R0.5): report-only, against .forgejo/allowed_signers as BEFORE had it
-  git_ clone -q "$work/gate-ok.git" "$work/signers" && cd "$work/signers"
+  sec_signers
+}
+
+# Also runnable alone: bash tests/run.sh signers.
+sec_signers() {
+  consumer "$work/signers" && cd "$work/signers" && commit init && mkdir -p .forgejo
   local k
   for k in person routine agent; do ssh-keygen -q -t ed25519 -N '' -C "$k" -f "$work/sk-$k"; done
   { echo "daniel@person $(cut -d' ' -f1,2 "$work/sk-person.pub")"; echo "daniel@routine $(cut -d' ' -f1,2 "$work/sk-routine.pub")"
@@ -1196,15 +1200,21 @@ sec_ci() {
   expect "is checked against the old file" holds "(add my key): signed by a key not in .forgejo/allowed_signers"
   expect "and the file needs a person" holds "changes .forgejo/allowed_signers, which needs a @person signature"
   sg routine tag -s -m v1 v1 && sg agent tag -s -m v2 v2 && git_ -c tag.gpgsign=false tag v3
-  ran "ci signers: a routine tag" ci_ REF=refs/tags/v1 AFTER=refs/tags/v1 signers
-  expect "passes (for now)" has "tuteur: signers: tag v1, 0 finding(s) (the signers file is the pushed one's: no SIGNERS_REF) (report-only)"
-  ran "ci signers: an agent's tag" ci_ REF=refs/tags/v2 AFTER=refs/tags/v2 signers
-  expect "is reported" holds "tag v2 is signed by agent@h: a tag needs a @person or @routine key"
-  ran "ci signers: a lightweight tag" ci_ REF=refs/tags/v3 AFTER=refs/tags/v3 signers
+  local target && target=$(git_ rev-parse --short=12 HEAD)
+  ran "ci signers: a routine tag" ci_ REF=refs/tags/v1 AFTER=refs/tags/v1 PUSH_ACTOR= signers
+  expect "records the verified signer, even without a forge actor" has "tuteur: signers: tag v1 -> $target; signed by daniel@routine; pushed by unknown; 0 finding(s) (the signers file is the pushed one's: no SIGNERS_REF) (report-only)"
+  ran "ci signers: an agent's tag" ci_ REF=refs/tags/v2 AFTER=refs/tags/v2 PUSH_ACTOR=alice signers
+  expect "signer and push account are distinct; no warning on agent keys" holds "tag v2 -> $target; signed by agent@h; pushed by alice; 0 finding(s)"
+  ran "ci signers: a lightweight tag" ci_ REF=refs/tags/v3 AFTER=refs/tags/v3 PUSH_ACTOR=alice signers
   expect "is reported" holds "tag v3 is lightweight"
+  expect "still attributes the push" holds "tag v3 -> $target; lightweight (no tag signature); pushed by alice; 1 finding(s)"
+  git_ -c tag.gpgsign=false tag -a -m unsigned unsigned
+  ran "ci signers: an unsigned annotated tag" ci_ REF=refs/tags/unsigned AFTER=refs/tags/unsigned PUSH_ACTOR=alice signers
+  expect "does not credit the tagger as signer" holds "tag unsigned -> $target; unsigned; pushed by alice; 1 finding(s)"
   # a tag on a commit that adds its own key: checked against the default branch's file (SIGNERS_REF)
   sg new tag -s -m v4 v4
-  ran "ci signers: a tag signed by the key its commit adds" ci_ REF=refs/tags/v4 AFTER=refs/tags/v4 SIGNERS_REF="$before" signers
+  ran "ci signers: a tag signed by the key its commit adds" ci_ REF=refs/tags/v4 AFTER=refs/tags/v4 PUSH_ACTOR=alice SIGNERS_REF="$before" signers
+  expect "does not attribute an unverified signature" holds "tag v4 -> $target; unverified; pushed by alice; 1 finding(s)"
   expect "does not vouch for itself" holds "tag v4: no signature that verifies against .forgejo/allowed_signers"
   expect "and says which file" holds "(the signers file is $before's)"
   ran "ci signers: a force-push's old commit, gone" ci_ REF=refs/heads/main BEFORE=1111111111111111111111111111111111111111 AFTER=HEAD SIGNERS_REF="$before" signers

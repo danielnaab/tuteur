@@ -302,8 +302,10 @@ a push; its findings are warnings in the job's log.
 
 2. Commit it signed with the `@person` key, and copy `template/.forgejo/workflows/tuteur-signers.yaml` (at the
    version you pin) to `.forgejo/workflows/`. Set its `branches:` line to your default branch.
-3. Push. The job's log ends `tuteur: signers: N commit(s) on refs/heads/main, M finding(s) (report-only)`, with
-   one warning per finding ([ci signers](../reference/commands.md#ci)).
+3. Push. On the default branch the job's log ends `tuteur: signers: N commit(s) on refs/heads/main, M finding(s) (report-only)`.
+   For a release tag, look for `signed by …; pushed by …`: the first is the verified key's principal, the second the forge
+   account. Any recognized signer can sign the tag. An unsigned or unverifiable tag gets a warning, not a failed job
+   ([ci signers](../reference/commands.md#ci)).
 
 The file the check trusts is the one the branch had before the push, so a push that changes the file is checked
 against the old one; a tag or a new branch is checked against the default branch's. The push that adds the file

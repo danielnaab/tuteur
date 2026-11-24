@@ -245,7 +245,8 @@ The workflows also find graft's marker README, through 0.1.x. tuteur-upgrade's p
 `tuteur-signers.yaml` (since graft v2.21.0) runs [`ci signers`](commands.md#ci) on each push to the default branch and
 each tag: report-only, it never fails. Its `branches:` line is yours, as tuteur-check's is; its step that runs
 tuteur is `Signers (report-only)`. It needs `.forgejo/allowed_signers` in the repository: an ssh
-`allowed_signers` file whose principals are `daniel@person`, `daniel@routine` and `agent@HOST`.
+`allowed_signers` file with principals such as `daniel@person`, `daniel@routine` and `agent@oak`. On tag pushes
+it passes the forge event's account to the check as `PUSH_ACTOR`, separately from the verified tag signer.
 
 ### Keep your own edits to a workflow
 

@@ -147,7 +147,8 @@ keeps the files that `.gitattributes` export-ignores; in your own cache, that tr
    `pot` input to pot's newest release, if it moved.
 4. Run `nix flake check`, `nix flake check ./dev` and `bash tests/run.sh`.
 5. Commit.
-6. Tag the commit, signed and annotated: `git tag -s -m vX.Y.Z vX.Y.Z`.
+6. Tag the commit, signed and annotated: `git tag -s -m vX.Y.Z vX.Y.Z`. Use your own recognized signing key;
+   an agent key is fine too. The signer workflow reports which key signed and which forge account pushed.
 7. Push the `main` branch and the tag. Never push a `v2.*` tag here: graft's tags stay in graft's repository, and a
    `v2` tag would read as a later series than every `0.y`.
 8. Print the hash that consumers lock, through another empty cache:

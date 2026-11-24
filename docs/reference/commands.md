@@ -491,7 +491,12 @@ prints a brief, also when checks fail.
     `GRAFT_SIGNERS_PERSON` is read when it is not set, through 0.1.x; so are `GRAFT_SIGNERS_MAX` and `_FILE`), shell
     patterns where `*` also matches `/` (default: `grants.json`, `.forgejo/allowed_signers`, `AGENTS.md`,
     `CLAUDE.md`, `.claude/*`, `.pi/*`, each at any depth);
-  - a tag that is lightweight, unsigned, or signed by neither a `@person` nor a `@routine` key.
+  - a lightweight or unsigned tag, or a tag whose signature does not verify against the signers file.
+
+  For a tag push, the summary names the tag, its peeled target object ID, the verified SSH principal (any class)
+  or `lightweight (no tag signature)`, `unsigned` or `unverified`, and the push account (`PUSH_ACTOR`, or `unknown`
+  outside the workflow). The account that pushed the tag is not necessarily its signer or the publisher of a release page.
+  Example: `tuteur: signers: tag v1 -> 4b53d780eda1; signed by agent@oak; pushed by alice; 0 finding(s) … (report-only)`.
 
   A new branch checks its newest `TUTEUR_SIGNERS_MAX` commits (100). No signers file is itself a finding.
   The summary: `tuteur: signers: N commit(s) on REF, M finding(s) (report-only)`. It reads git objects and the
