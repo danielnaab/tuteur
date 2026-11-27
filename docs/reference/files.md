@@ -14,7 +14,7 @@ The files tuteur reads and writes, and the lines in them that tuteur recognizes.
 | `.gitmodules` | Written by `git submodule add` (through `tuteur add`) and `git rm`. Read by every command. | Each pattern's path and URL. `upgrade` never changes it. |
 | The gitlinks | Written by `add` and `upgrade`, or by `git add .patterns/NAME`. | The pins. Each must be a gitlink (mode 160000 in `git ls-files -s`), never the pattern's files: `check` fails on a registered path tracked as files, and `add` refuses to add over one. |
 | `<dir>/<name>/` | A submodule. Filled by `git submodule update --init --recursive`, `tuteur sync`, a recursive clone, or the post-checkout hook. | The provider's whole repository at a release tag. |
-| `<dir>/README.md` | Written by `add` and `sync`; `check` looks for its marker line. | The marker README. |
+| `<dir>/README.md` | Written by `add`, `sync` and `upgrade`; `check` finds the folder by its marker line, and compares its text. | The [marker README](#the-marker-readme): tuteur's rules for the patterns, and a link to each pattern's guide. Do not edit. Point your `AGENTS.md` at it. |
 | `<dir>/kits.just` | Written by `add`, `sync` and `upgrade`, and staged; compared by `check`. Only where the repository uses it (the file exists, or the top `justfile` names `<dir>/kits.just`) and the flake has `pot-kits` (`inputs.pot`). Tracked. | The [generated recipes](#kitsjust). Do not edit. |
 | `.tuteur-try` | Written by `try`, at the repository's top, and marked with intent to add; removed by `try --stop`. `check` fails while it exists, and while graft's `.graft-try` does. Never committed. | Makes every Nix build of a git flake read the working tree. Two `#` comment lines. See [try](commands.md#try). |
 | `.forgejo/workflows/tuteur-*.yaml` | Restored by `sync`, replaced by `upgrade`, compared by `check`. `sync` renames graft's marked `graft-*.yaml` to these first. | tuteur's workflows, if they carry the marker. |
@@ -27,9 +27,9 @@ Inside a [pot run](https://github.com/danielnaab/pot/blob/v0.1.0/docs/reference/
 
 ## The marker README
 
-`<dir>/README.md`. `add` writes it when it is missing; `sync`, and `upgrade` when tuteur's pin moves, write
-it again with this tuteur version's text (`tuteur: wrote .patterns/README.md`). For a flake at the repository's
-top:
+`<dir>/README.md`. `add`, `sync` and `upgrade` write it (`tuteur: wrote .patterns/README.md` when it changed):
+`upgrade` with the text of the tuteur version it moves to, when tuteur's pin moves. For a flake at the
+repository's top, with the patterns `knowledge-base-kit` and `notebook-kit`:
 
 ```markdown
 <!-- managed by tuteur: https://github.com/danielnaab/tuteur -->
@@ -43,10 +43,31 @@ Run `git submodule update --init --recursive` (or `nix run .#tuteur sync`).
   push to the provider, release, then `nix run .#tuteur upgrade NAME`.
 - `nix run .#tuteur check` fails until every pattern is clean and at a release tag, and while try is on.
 - Versions: `nix run .#tuteur outdated`.
+
+## What each pattern offers
+
+Each pattern's guide says what it ships for this repository (tools, recipes, checks, settings) and
+which of its docs to read when. Read a pattern's guide before you use what it ships. Point this repository's
+AGENTS.md here, then add its own rules.
+
+- [knowledge-base-kit](knowledge-base-kit/README.md) (it has no USING.md: its README)
+- [notebook-kit](notebook-kit/USING.md)
 ```
 
-tuteur's text is `lib/patterns-readme.md`, with `@RUN@` replaced by the flake's run command. For a flake in a
-subdirectory, that is `nix run 'path:nix/agent-tools#tuteur'`. `check` reads only the marker line.
+tuteur's text is `lib/patterns-readme.md`, with `@RUN@` replaced by the flake's run command (for a flake in a
+subdirectory, `nix run 'path:nix/agent-tools#tuteur'`), then one line per pattern that `.gitmodules` registers,
+by name. Each links the pattern's [`USING.md`](#usingmd) at its recorded commit, or its `README.md` when it has
+none (`lib/patterns-readme.sh`). The links are relative to the README, so they hold for a flake in a
+subdirectory too.
+
+- **`check` compares the text** from the repository's own app (`nix run .#tuteur check`), not with
+  `--committed`, and only when every pattern is filled: an empty pattern's guide can't be told. A difference
+  fails: `tuteur: .patterns/README.md is stale or edited: tuteur sync`. A README with graft's marker is not
+  compared through 0.1.x: `check` names it, and `sync` rewrites it.
+- **An empty pattern stops a write.** `add`, `sync` and `upgrade` leave the file as it is and say so:
+  `tuteur: .patterns/README.md: not written: .patterns/x is empty (tuteur sync fills it)`.
+- **Your own rules go in your `AGENTS.md`,** not here: link this README from it, and add what is yours, such as
+  which pattern's rules win where two differ ([Add your first pattern](../guides/add-a-pattern.md#steps), step 6).
 
 - **The marker line** is how tuteur's commands and workflows find the patterns folder, and the flake (its
   parent directory). Exactly one per repository.
@@ -134,12 +155,28 @@ living-specifications, then meta-knowledge-base. Keep providers to one level
 | Tags | Semver tags (`v1.2.3` or `1.2.3`) are versions. Other tags, such as `v1.3.0-rc.1`, are ignored. A tag may be lightweight, annotated or signed. Never move a released tag: consumers' gitlinks point at its commit. |
 | `CHANGELOG.md` | One `## vX.Y.Z` (or `## X.Y.Z`) section per release; anything can follow the version, such as the date. A major version's section has an `### Upgrading` subsection (tuteur also takes `### Migration`). tuteur reads it from the provider's repository at the target tag. |
 | `tuteur.nix` | Optional. What the provider contributes to a consumer's flake ([below](#tuteurnix)). |
-| `README.md` | Say what to point agents at, which tools the provider ships, and which settings file they read. |
+| `USING.md` | Optional. The guide for the repositories that use the provider, which each consumer's marker README links ([below](#usingmd)). |
+| `README.md` | What the provider is. A consumer's marker README links it when there is no `USING.md`. |
 | `.gitattributes` | No longer read by tuteur. A consumer gets the whole repository. `export-ignore` lines still apply to `git archive`, if you use it. |
 
 A consumer gets every committed file, so link only to files that exist in the repository, and keep a
 provider's own agent instructions (`AGENTS.md`, `CLAUDE.md`) for work on the provider: a consumer's agent
 reads the files that its own `AGENTS.md` points at, not the pattern's.
+
+### USING.md
+
+The provider's guide for an agent, or a person, in a repository that uses it: what the provider ships and how
+to use it from there. Each consumer's [marker README](#the-marker-readme) links it, so a consumer's `AGENTS.md`
+needs one line for every pattern, not a section each. Keep it short, and write it for a reader who knows only
+their own repository:
+
+- what it ships for the consumer: tools, `just` recipes, checks, and the settings file they read, such as
+  `knowledge-base.yaml`;
+- which of its docs to read for which task, as links relative to `USING.md`, to files in the repository;
+- what the consumer owns and may change, and what it reads in place and must not.
+
+A provider's `AGENTS.md` stays about work on the provider. tuteur reads only whether the file exists at the
+pattern's recorded commit.
 
 ### tuteur.nix
 

@@ -141,7 +141,7 @@ Every command first refuses a copy-mode patterns README (one with a `| Scion | C
 
 | Command | What it does |
 |---|---|
-| `add [-C REPO] [--dir PATH] URL[@TAG] [NAME]` | Adds a pattern at `TAG`, default the newest version upstream. `NAME` defaults to the URL's last segment without `.git`. Runs `git submodule add`, checks out the tag's commit, writes the marker README if it is missing, and stages `.gitmodules`, the gitlink and the README. |
+| `add [-C REPO] [--dir PATH] URL[@TAG] [NAME]` | Adds a pattern at `TAG`, default the newest version upstream. `NAME` defaults to the URL's last segment without `.git`. Runs `git submodule add`, checks out the tag's commit, writes the marker README (with the new pattern's guide), and stages `.gitmodules`, the gitlink and the README. |
 | `sync` (the default) | Fills every empty pattern and its own submodules, writes the marker README, and refreshes tuteur's workflows (renaming graft's marked `graft-*.yaml`). Never moves a gitlink, and never moves a filled pattern. In the repository's own flake only. |
 | `check [-C REPO] [--committed]` | Fails unless every rule in [Check](#check) holds. |
 | `status [-C REPO] [--json]` | For tuteur and each pattern: the pin, the tag it is at, whether it is registered, filled and clean, the newest release, and `check`'s messages. Changes nothing; exit 0 whatever their state. `--json` prints [status/1](../../contracts/status-1.md). See [status](#status). |
@@ -167,8 +167,8 @@ sandbox in tuteur: [pot](https://github.com/danielnaab/pot) is its own repositor
   a `flake.nix` (`nix/agent-tools/.patterns`); else the repository's own app's `dir`, beside its flake; else
   `.patterns` at the top. `--scions PATH` is graft's name for `--dir`, read through 0.1.x, with one line saying so.
 - It runs `git submodule add`, checks out the tag's commit detached, fills the pattern's own submodules
-  recursively, writes the marker README if it is missing, and stages `.gitmodules`, the gitlink and the
-  README. A pattern removed with `git rm` can be added again.
+  recursively, writes the marker README (with the new pattern's guide), and stages `.gitmodules`, the gitlink
+  and the README. A pattern removed with `git rm` can be added again.
 - Prints `tuteur: .patterns/NAME <- v1.1.0 (abc1234)`, then
   `tuteur: note: .patterns/NAME has its own submodules (.patterns/docs) …` when it has
   some (it has filled them), then `tuteur: next: commit`, or, for a flake at the top that lacks it,
@@ -237,6 +237,7 @@ The marker README's commands name this flake's run command: `nix run .#tuteur` f
 | … and that tag is upstream | `tuteur: .patterns/pa: tag v1.0.1 exists locally but not at URL: push it (git -C .patterns/pa push origin v1.0.1)` |
 | The tools and checks evaluate (from `nix run .#tuteur` only, after every other rule passed) | `tuteur: the flake's tools or checks don't evaluate (above): a provider's tuteur.nix fails` |
 | `<patterns>/kits.just` matches what the flake generates, when the repository uses it (the file exists, or the top `justfile` names `<patterns>/kits.just`); from `nix run .#tuteur` only, not `--committed` | `tuteur: .patterns/kits.just is stale or edited: tuteur sync`; inside a pot run, `tuteur: .patterns/kits.just is stale or edited: run tuteur sync on the host (the patterns folder is read-only in a run)`; when the flake's bundle fails, `tuteur: .patterns/kits.just: the flake's pot-kits doesn't evaluate (above)`; when the flake has no `pot-kits` (no `inputs.pot`) and the file is there, `tuteur: .patterns/kits.just is here but this flake has no pot-kits (no inputs.pot): add inputs.pot, or remove the file` |
+| `<patterns>/README.md` is the text tuteur writes: its rules and a link to each pattern's guide; from `nix run .#tuteur` only, not `--committed`, once every pattern is filled | `tuteur: .patterns/README.md is stale or edited: tuteur sync`; inside a pot run, `tuteur: .patterns/README.md is stale or edited: run tuteur sync on the host (the patterns folder is read-only in a run)` |
 | No `kits.just` recipe has the name of one of the top `justfile`'s own (when it is used) | `tuteur: .patterns/kits.just's recipe X has the name of the justfile's own X: rename one (a kit's recipe never replaces yours)`; `sync` warns with the same line |
 | `kits.just` is a file, not a link | `tuteur: .patterns/kits.just is a symbolic link; tuteur writes only a file there: remove it, then tuteur sync` |
 | Each root input of the flake's `flake.lock` at a version tag (`github:`, or `git` such as tuteur's own pin) holds its tag's tree: its `narHash` is the NAR hash of `git archive` of the locked commit, fetched by its tag, with the provider's `export-ignore` rules for `github:` and `exportIgnore` inputs and without them for other `git` inputs (both modes) | `tuteur: flake.lock pins tuteur at v0.1.0 (928a188) with narHash sha256-…, but its tag's git archive hashes to sha256-…: Nix's fetch cache probably gave the lock a tree that another fetch of that commit left there (a git+file: or . fetch keeps the files a provider export-ignores), and a machine without that cache, such as CI, fails with NAR hash mismatch: re-lock tuteur through an empty fetch cache: XDG_CACHE_HOME=$(mktemp -d) nix flake update tuteur` (for a flake in a subdirectory, `nix flake update --flake path:… tuteur`). A pin it cannot fetch gets a note and no failure: `tuteur: can't fetch tuteur's v0.1.0 from URL (…): flake.lock's narHash for it not compared with its tag's git archive` |
@@ -270,8 +271,8 @@ The marker README's commands name this flake's run command: `nix run .#tuteur` f
 - No patterns folder: `tuteur: no patterns here (no README.md carrying tuteur's marker); tuteur add URL adds one`,
   exit 0 (unless a workflow fails).
 
-`check` does not compare the marker README's text: the marker line is what finds the patterns folder. Each
-message and its fix: [`tuteur check` fails](../guides/check-fails.md).
+The marker line finds the patterns folder; from the repository's own app, `check` also compares the README's
+text ([The marker README](files.md#the-marker-readme)). Each message and its fix: [`tuteur check` fails](../guides/check-fails.md).
 
 ### status
 
@@ -420,6 +421,8 @@ interface), and is `null` when there is none. With nothing to list:
   version with that script (`tuteur: tuteur v0.0.9 has no lib/refresh.sh, so tuteur upgrade can't hand it this
   repository; move it by hand`), and in CI only from `tuteur ci` (`tuteur: not moving tuteur itself from a CI job
   that isn't tuteur ci (…)`).
+- When tuteur's pin stays and a pattern moves, `upgrade` writes the marker README again (this version's
+  text), never the workflows: a moved pattern may have gained or dropped its `USING.md`.
 - Then an input named `pot` at a version tag, by the same rule: its tag in `flake.nix`, then
   `nix flake update pot` through the same empty fetch cache (`tuteur: pot v0.1.0 -> v0.1.1`). Nothing of pot's
   runs.
@@ -475,7 +478,7 @@ prints a brief, also when checks fail.
   CHANGELOG of tuteur's own input, `pot` and each moved pattern. It needs `PR_TOKEN`; tuteur's workflow gives it
   `secrets.TUTEUR_PR_TOKEN || secrets.GRAFT_PR_TOKEN || github.token`. It opens or updates the pull request only when the branch changes nothing but `flake.nix`,
   `flake.lock`, gitlinks of patterns that the default branch's `.gitmodules` registers, and the marker README
-  when tuteur's own pin moved. A change to `.forgejo/` is refused (`… changes CI workflows …`), also when
+  when tuteur's own pin or a pattern moved. A change to `.forgejo/` is refused (`… changes CI workflows …`), also when
   tuteur moved; so is `.gitmodules` and any other file (`… changes files tuteur upgrade never writes: …`).
 - `ci signers` (since graft v2.21.0): report-only; it always exits 0. It reads `REF` (the pushed ref), `BEFORE` (its
   old commit; empty or all zeros for a new ref) and `AFTER` (its new commit, default `HEAD`), and checks what the

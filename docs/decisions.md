@@ -91,6 +91,17 @@ patterns and their URLs, the marker README for the patterns folder and the flake
 for its outputs, and marker lines in workflows (`# managed by tuteur`, `# tuteur ssh:`). A declaration in the
 file cannot drift from it.
 
+## A pattern's guide is its USING.md, linked from the marker README
+
+A consumer's agents read what its `AGENTS.md` points at, and each consumer used to write, by hand, a pointer into
+every pattern's docs, which an upgrade could leave dangling. A provider writes its guide for consumers once, in
+`USING.md` (its `AGENTS.md` stays about work on the provider), and the marker README, which tuteur already writes,
+links each pattern's guide at its recorded commit. A consumer's `AGENTS.md` links that README once. A file at a
+fixed name, not a `tuteur.nix` attribute: tuteur's commands read it without evaluating Nix, and a provider
+without Nix wiring has one too ([Declarations live in the files they describe](#declarations-live-in-the-files-they-describe)).
+Links, not imports: `@` imports are one agent tool's, and would load every guide into every session. tuteur
+links the guides and never copies their text, as it hands text to agents and never runs one.
+
 ## Two repositories: tuteur produces kits, pot runs them
 
 From graft v2.16.0 to v2.22.0, graft and pot shipped in one repository and one flake, with one-way arrows between

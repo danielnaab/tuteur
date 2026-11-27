@@ -174,13 +174,14 @@ consumer() {
   printf '{\n%s\n}\n' "${2:-$body}" > "$c/flake.nix"
 }
 # by_hand NAME [TAG [DIR]]: tuteur NAME at TAG (default v1.0.0) into DIR (default patterns) of the repo in
-# the current directory, with plain git, as tuteur add does; staged
+# the current directory, with plain git, as tuteur add does, and the README tuteur's lib writes; staged
 by_hand() {
   local d=${3:-.patterns}
   git_ submodule add -q --force -- "$(url "$1")" "$d/$1" 2>/dev/null
   git_ -C "$d/$1" checkout -q --detach "${2:-v1.0.0}"
-  [ -f "$d/README.md" ] || cp "$tuteur/lib/patterns-readme.md" "$d/README.md"
-  git_ add -- "$d/$1" "$d/README.md" .gitmodules
+  git_ add -- "$d/$1" .gitmodules
+  bash "$tuteur/lib/patterns-readme.sh" write "$d" "nix run .#tuteur" >/dev/null
+  git_ add -- "$d/README.md"
 }
 commit() { git_ add -A && git_ commit -q --allow-empty -m "${1:-commit}"; }
 # tools_out TOOL: run TOOL from the current directory's tools
@@ -410,6 +411,8 @@ EOF
   echo "policy" > "$work/src/pa/docs/policy.md" && echo "old" > "$work/src/pa/docs/old/x.md"
   printf v1.0.0 > "$work/src/pa/version" && release pa v1.0.0
   printf v1.0.1 > "$work/src/pa/version" && release pa v1.0.1
+  # pa's guide for the repositories that use it, from v1.1.0 (v1.2.0 drops it)
+  echo "# Using pa" > "$work/src/pa/USING.md"
   printf v1.1.0 > "$work/src/pa/version" && release pa v1.1.0 -a
   git_ -C "$work/src/pa" tag not-a-version && git_ -C "$work/src/pa" push -q origin not-a-version
   # nest: a provider with a submodule of its own
@@ -434,9 +437,12 @@ sec_add() {
   expect "add: the README carries tuteur's marker" test "$(head -1 .patterns/README.md)" = "<!-- managed by tuteur: https://github.com/danielnaab/tuteur -->"
   # shellcheck disable=SC2016 # markdown backticks
   expect "and names the repo's command" grep -qF '`nix run .#tuteur check`' .patterns/README.md
+  expect "add: the README links the pattern's guide, its USING.md" grep -qxF -- '- [pa](pa/USING.md)' .patterns/README.md
   expect "add: the URL in .gitmodules as given" test "$(git_ config -f .gitmodules submodule..patterns/pa.url)" = "$(url pa)"
   ran "add: URL@TAG" g add "$(url docs)@v1.0.0"
   expect "at that tag" has "tuteur: .patterns/docs <- v1.0.0 ($(sha docs v1.0.0 | cut -c1-7))"
+  expect "add: a pattern without USING.md: its README, by name after pa" \
+    test "$(grep '^- \[' .patterns/README.md | paste -sd ' ')" = "- [docs](docs/README.md) (it has no USING.md: its README) - [pa](pa/USING.md)"
   ran "add: a provider with submodules of its own" g add "$(url nest)"
   expect "says Nix fetches them" has "tuteur: note: .patterns/nest has its own submodules (.patterns/docs); tuteur fills them, and Nix fetches them too, so each must be reachable"
   expect "and fills them" test -f .patterns/nest/.patterns/docs/policy.md
@@ -507,6 +513,11 @@ sec_check() {
   cd "$work/cmd"
   ran "check: every pattern clean and at a release tag" g check
   expect "says so" has "tuteur: 3 patterns clean and at release tags"
+  echo "mine" >> .patterns/README.md
+  refused "check: an edited patterns README" g check
+  expect "says to sync" has "tuteur: .patterns/README.md is stale or edited: tuteur sync"
+  ran "check --committed: doesn't compare it" g check --committed
+  git_ checkout -q -- .patterns/README.md
   # a submodule the index holds as files (what `git add` does over a copied pattern still in the index)
   git_ rm -q --cached .patterns/docs && git_ update-index --add --cacheinfo "100644,$(git_ hash-object -w .patterns/docs/policy.md),.patterns/docs/policy.md"
   refused "check: a submodule tracked as files" G check -C .
@@ -582,6 +593,7 @@ sec_check() {
 # pa's next releases: v1.2.0 (a minor), v2.0.0 (a major that renames, deletes, and has Upgrading
 # steps, and text a shell would expand)
 pa_next() {
+  rm "$work/src/pa/USING.md"
   printf v1.2.0 > "$work/src/pa/version" && release pa v1.2.0
   cat > "$work/src/pa/CHANGELOG.md" <<'EOF'
 # Changelog
@@ -804,7 +816,8 @@ sec_upgrade() {
   expect "says what moved" has "tuteur: pa v1.1.0 -> v1.2.0"
   expect "and the major not taken" has "tuteur: pa: v2.0.0 is a breaking version (new major, or new 0.y); not taken (tuteur upgrade pa@v2.0.0)"
   expect "the pattern checked out at the tag" test "$(git_ -C .patterns/pa rev-parse HEAD)" = "$(sha pa v1.2.0)"
-  expect "and its gitlink staged" test "$(git_ diff --cached --name-only)" = ".patterns/pa"
+  expect "and its gitlink staged, and the README" test "$(git_ diff --cached --name-only | paste -sd ' ')" = ".patterns/README.md .patterns/pa"
+  expect "upgrade: the README follows the guide (v1.2.0 has no USING.md)" grep -qxF -- '- [pa](pa/README.md) (it has no USING.md: its README)' .patterns/README.md
   expect ".gitmodules untouched" cmp -s .gitmodules "$work/gm-before"
   expect "the fix branch kept" quiet git_ -C .patterns/pa rev-parse -q --verify refs/heads/fix
   ran "upgrade: again, nothing to do" g upgrade
@@ -1105,6 +1118,8 @@ sec_ci() {
   refused "ci upgrade: refuses an untracked file" ci_ BRANCH=tuteur/upgrade upgrade
   expect "says why" has "tuteur: ci upgrade commits every change in the working tree, and this one has the changes of its own above: commit, stash or remove them first"
   rm -f .env.local
+  # the workflow fills the patterns before ci upgrade (tuteur-upgrade.yaml), so the README can link their guides
+  git_ submodule update -q --init --recursive
   # C1: the check after the upgrade sees the NEW pattern (committed first, then checked)
   ran "ci upgrade: moves pa and checks the result" ci_ GITHUB_OUTPUT="$work/ci-out" BRANCH=tuteur/upgrade upgrade
   expect "changed=true" grep -qx changed=true "$work/ci-out"
@@ -1113,12 +1128,13 @@ sec_ci() {
   body=$(git_ -C "$work/gate-ok.git" log -1 --format=%b tuteur/upgrade)
   expect "pushed, its commit naming the move" grep -qx "tuteur: pa v1.1.0 -> v1.2.0" <<<"$body"
   expect "the gitlink pushed" test "$(git_ -C "$work/gate-ok.git" ls-tree tuteur/upgrade .patterns/pa | awk '{ print $3 }')" = "$(sha pa v1.2.0)"
+  expect "and the README, pa's guide gone" grep -qxF -- '- [pa](pa/README.md) (it has no USING.md: its README)' <(git_ -C "$work/gate-ok.git" show tuteur/upgrade:.patterns/README.md)
   : > "$work/ci-out"
   ran "ci upgrade: again, nothing to do" ci_ GITHUB_OUTPUT="$work/ci-out" BRANCH=tuteur/upgrade upgrade
   expect "changed=false" grep -qx changed=false "$work/ci-out"
-  git_ checkout -q main
+  git_ checkout -q main && git_ submodule update -q --recursive
   stub_pr pr1
-  expect "ci pr: opens the PR for a branch that only moves a gitlink" grep -q "http://stub/pulls/1" "$work/pr1.out"
+  expect "ci pr: opens the PR for a branch that moves a gitlink (and the README with it)" grep -q "http://stub/pulls/1" "$work/pr1.out"
   expect "with the token in a header" grep -qx "POST token s3cret" "$work/pr1.auth"
   out=$(post_body pr1)
   expect "the body lists the move" has "- pa v1.1.0 -> v1.2.0"
@@ -1126,7 +1142,7 @@ sec_ci() {
   expect "and that the check passed" holds "whole \`nix flake check\` passed"
   expect "and what changed upstream" has "### pa v1.1.0 -> v1.2.0"
   expect "its commits (no CHANGELOG at v1.2.0)" grep -q "^> - [0-9a-f]* v1.2.0$" <<<"$out"
-  # what ci pr refuses: a .gitmodules change, a workflow change; the README only when tuteur moved
+  # what ci pr refuses: a .gitmodules change, a workflow change; the README only when tuteur or a pattern moved
   push_branch() { git_ push -q --force origin HEAD:refs/heads/tuteur/upgrade && git_ checkout -q main; }
   git_ fetch -q origin
   git_ checkout -q -b x1 origin/tuteur/upgrade && git_ config -f .gitmodules submodule..patterns/pa.url "file://$work/elsewhere.git" && commit swap && push_branch
@@ -1138,7 +1154,7 @@ sec_ci() {
   expect "ci pr: a workflow change: refused" grep -q "changes CI workflows" "$work/pr3.out"
   git_ checkout -q -b x3 origin/main && echo "x" >> .patterns/README.md && commit readme && push_branch
   stub_pr pr4
-  expect "ci pr: the README without tuteur moving: refused" grep -q "changes files tuteur upgrade never writes: .patterns/README.md" "$work/pr4.out"
+  expect "ci pr: the README without tuteur or a pattern moving: refused" grep -q "changes files tuteur upgrade never writes: .patterns/README.md" "$work/pr4.out"
   # shellcheck disable=SC2016 # a jq program
   git_ checkout -q -b x4 origin/main && echo "x" >> .patterns/README.md \
     && jq '.nodes.tuteur.locked.narHash = "sha256-moved"' flake.lock > "$work/lock" && cp "$work/lock" flake.lock && commit "tuteur moved" && push_branch
@@ -1319,7 +1335,8 @@ EOF
   expect "says why" has "tuteur: tuteur try is on; nothing changed: tuteur try --stop first"
   ran "try: sync runs, and says try is on" g sync
   expect "a note" has "tuteur: note: tuteur try is on: tuteur try --stop turns it off before you commit"
-  git_ add .patterns/README.md && git_ commit -qm "sync's README" -- .patterns/README.md
+  git_ add .patterns/README.md
+  git_ diff --cached --quiet -- .patterns/README.md || git_ commit -qm "sync's README" -- .patterns/README.md
   # a parent reset leaves the marker untracked: Nix no longer reads the working tree
   git_ reset -q
   refused "try: check after a parent reset" G check -C .

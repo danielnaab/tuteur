@@ -11,8 +11,8 @@ in a consumer.
 - The terms provider, consumer and pattern are in [Concepts](../concepts.md). Any git repository with semver
   tags can be a provider. How to name it is in [Files](../reference/files.md#naming).
 - Consumers get your **whole repository** at the tag, as a submodule: tests, CI files and all. Keep instructions
-  for your own agents (`AGENTS.md`) about work on the provider; tell consumers in your README what to point
-  their agents at.
+  for your own agents (`AGENTS.md`) about work on the provider. Write the guide for consumers' agents in
+  `USING.md`: each consumer's patterns README links it ([Files: USING.md](../reference/files.md#usingmd)).
 - The example releases `note-kit` v1.2.0, which fixes its tool, `note-lint`. `team-notes` adds it.
 - Choose the version: a patch version for a fix, a minor version for an addition (a new tool, a first
   `tuteur.nix`), and a major version for a change that can break a consumer

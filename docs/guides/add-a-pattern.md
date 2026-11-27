@@ -109,6 +109,8 @@ and end with `tuteur check` passing and everything committed.
    ## Patterns (tuteur)
    `.patterns/` holds git submodules: other repositories at release tags. Read them; they are the rules and tools
    this repository follows. If one is empty, run `git submodule update --init --recursive`.
+   - [.patterns/README.md](.patterns/README.md) links each pattern's guide: what it ships here and which of its
+     docs to read when. Read a pattern's guide before you use what it ships.
    - Ask before you edit a pattern: an edit there is a change to another repository. Fix it in the provider: in
      `.patterns/NAME`, `git switch -c fix-…`, edit, run the provider's own tests there, push the branch to the
      provider and open its pull request. This repository takes the fix with `nix run .#tuteur upgrade NAME@TAG`
@@ -125,8 +127,12 @@ and end with `tuteur check` passing and everything committed.
 
    For a flake in a subdirectory, write its command, `nix run 'path:DIR#tuteur'`, for `nix run .#tuteur`.
 
-   Then add a line that says what to follow, for example
-   `Follow the policies in .patterns/knowledge-base-kit/docs/policies/.` If your agent tool denies edits to
+   tuteur keeps the list of guides in `.patterns/README.md` as patterns come and go, so this section does not
+   change when you add one. Then add what is yours: which pattern's rules win where two differ, and links to the
+   few docs your agents need on every task, for example
+   `Follow the policies in .patterns/knowledge-base-kit/docs/policies/.` Link the README rather than importing
+   it (Claude Code's `@.patterns/README.md`): a link reads the same in every agent tool, and an agent reads a
+   pattern's guide when its task needs it, not on every session. If your agent tool denies edits to
    `.patterns/` (a Claude Code `permissions.deny` rule such as `Edit(.patterns/**)`, say), make it ask instead
    (`permissions.ask`), and list `.patterns/**` as ask-first, not denied, in any write rules your agents follow:
    a pattern edit is a provider fix that a person approves ([Fix a provider from a consumer](fix-a-provider.md)).

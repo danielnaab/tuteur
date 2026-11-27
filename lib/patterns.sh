@@ -4,7 +4,7 @@
 #   add [-C REPO] [--dir PATH] URL[@TAG] [NAME]
 #             add URL at TAG (default: its newest release) as the submodule PATTERNS/NAME (NAME
 #             default: URL's last segment, without .git), checked out at the tag's commit; writes
-#             the patterns README when missing; stages .gitmodules, the gitlink and the README.
+#             the patterns README (with the new pattern's guide); stages .gitmodules, the gitlink and the README.
 #   sync      (a repo's own app only) initialise every pattern not yet initialised (never one level
 #             further down, never moving one already there), then write tuteur's README and
 #             workflows for this version (refresh.sh). Never moves a gitlink.
@@ -27,14 +27,8 @@ template=${TUTEUR_TEMPLATE:-$here/../template}
 
 short() { echo "${1:0:7}"; }
 
-# the patterns README for this flake
-write_readme() {
-  local want
-  want=$(sed "s|@RUN@|$TUTEUR_RUN|g" "$here/patterns-readme.md")
-  if [ ! -f "$PATTERNS/README.md" ] || [ "$(cat "$PATTERNS/README.md")" != "$want" ]; then
-    printf '%s\n' "$want" > "$PATTERNS/README.md"
-  fi
-}
+# the patterns README for this flake (patterns-readme.sh)
+write_readme() { bash "$here/patterns-readme.sh" write "$PATTERNS" "$TUTEUR_RUN" >/dev/null; }
 
 # fill_nested PATH: initialise the pattern's own submodules that aren't, recursively, at the commits
 # it records. Nix reads them from the working tree whenever a tracked file of the repo is modified,
@@ -146,9 +140,11 @@ cmd_add() {
     || git -C "$path" fetch -q origin "$commit" || die "can't fetch $tag ($commit) from $url"
   git -C "$path" -c advice.detachedHead=false checkout -q --detach "$commit"
   fill_nested "$path"
-  write_readme
-  git add -- .gitmodules "$path" "$PATTERNS/README.md"
+  git add -- .gitmodules "$path"
   [ "$(gitlink "$path")" = "$commit" ] || die "$path was not recorded as a submodule (git ls-files -s $path); remove it (git rm -r -q --cached $path) and try again"
+  # after the gitlink: the README links the guide at the recorded commit
+  write_readme
+  git add -- "$PATTERNS/README.md"
   echo "tuteur: $path <- $tag ($(short "$commit"))"
   nested "$name" "$path"
   requires_note "$name" "$path"
@@ -321,7 +317,7 @@ pattern_facts() {
 }
 
 cmd_check() {
-  local repo="" committed="" rc=0 name path url lt n=0 registered err system p msg pf
+  local repo="" committed="" rc=0 name path url lt n=0 registered err system p msg pf rt
   while [ $# -gt 0 ]; do
     case $1 in
       -C) if [ $# -lt 2 ] || [ -z "$2" ]; then die "-C needs a repository"; fi; repo=$2; shift 2 ;;
@@ -398,6 +394,22 @@ cmd_check() {
         bad "$PATTERNS/kits.just is stale or edited: run tuteur sync on the host (the patterns folder is read-only in a run)"
       else
         bad "$PATTERNS/kits.just is stale or edited: tuteur sync"
+      fi
+    fi
+  fi
+  # the marker README: the text this tuteur writes, from the repository's own app (which knows how it runs
+  # tuteur), once every pattern is filled (an empty one's guide can't be told). graft's README is an alias
+  # through 0.1.x: aliases_in_use names it, and sync rewrites it
+  if [ -z "$committed" ] && [ -n "${TUTEUR_IN_REPO:-}" ] && [ -n "$PATTERNS" ] \
+     && ! grep -qsF -- "$OLD_MARKER" "$PATTERNS/README.md" \
+     && rt=$(bash "$here/patterns-readme.sh" text "$PATTERNS" "$TUTEUR_RUN" 2>/dev/null); then
+    if [ -L "$PATTERNS/README.md" ]; then
+      bad "$PATTERNS/README.md is a symbolic link; tuteur writes only a file there: remove it, then tuteur sync"
+    elif [ "$(cat "$PATTERNS/README.md")" != "$rt" ]; then
+      if [ -n "${POT:-}" ]; then
+        bad "$PATTERNS/README.md is stale or edited: run tuteur sync on the host (the patterns folder is read-only in a run)"
+      else
+        bad "$PATTERNS/README.md is stale or edited: tuteur sync"
       fi
     fi
   fi

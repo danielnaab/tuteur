@@ -90,7 +90,8 @@ git submodules give you a pinned clone. tuteur adds what makes them a dependency
 - **Empty folders answered.** Nix fetches patterns itself for a git flake while its tree is clean, a
   post-checkout hook that the guide gives fills them in new clones and worktrees, and `tuteur sync` fills them
   ([Clones, worktrees, sandboxes and CI](docs/guides/clones-and-worktrees.md)).
-- **An agent rule** for working with patterns, ready to paste into `AGENTS.md`.
+- **An agent rule** for working with patterns, ready to paste into `AGENTS.md`, and **each pattern's guide**
+  for your agents (its `USING.md`), linked from `.patterns/README.md` as patterns come and go.
 - **Kits for pot.** A provider's `tuteur.nix` may return a `kit` for [pot](https://github.com/danielnaab/pot),
   which runs agents and commands in a sandbox. tuteur hands it to pot unread, when your flake takes pot as an
   input of its own ([Declare kit commands](docs/guides/kit-commands.md)). tuteur depends on nothing of pot's.

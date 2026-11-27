@@ -137,7 +137,7 @@ migrate_ref() {
 
 pr() {
   local v head changes out code number line path d ok workflows="" other="" compare meta om nm base_lock head_lock tuteur_moved own notes body req
-  local moved="" held="" failing="" title
+  local moved="" held="" failing="" title readme_ok
   for v in API WEB BASE BRANCH PR_TOKEN; do [ -n "${!v:-}" ] || die "$v is not set"; done
   git fetch -q --no-tags origin "refs/heads/$BRANCH" || die "can't fetch $BRANCH"
   head=$(git rev-parse FETCH_HEAD)
@@ -148,9 +148,9 @@ pr() {
   compare="$WEB/compare/$BASE...$BRANCH"
 
   # What the branch may change without review: flake.nix and flake.lock, the gitlinks of the patterns
-  # the default branch has (a moved submodule stays a submodule), and, when tuteur's own pin moved,
-  # the patterns README (the new version's text). A new version's workflows are never opened
-  # unreviewed: they would run with the repo's secrets.
+  # the default branch has (a moved submodule stays a submodule), and, when tuteur's own pin or a
+  # pattern moved, the patterns README (the new version's text, or a moved pattern's guide). A new
+  # version's workflows are never opened unreviewed: they would run with the repo's secrets.
   git show HEAD:.gitmodules > "$TUTEUR_TMP/base.gitmodules" 2>/dev/null || : > "$TUTEUR_TMP/base.gitmodules"
   base_lock=$TUTEUR_TMP/base.lock head_lock=$TUTEUR_TMP/head.lock
   git show "HEAD:$FLAKE_LOCK" > "$base_lock"
@@ -162,12 +162,18 @@ pr() {
   fi
   declare -A pattern=()
   while IFS=$'\t' read -r _ d _; do [ -z "$d" ] || pattern[$d]=1; done < <(patterns_registered "$TUTEUR_TMP/base.gitmodules")
+  # a pattern moved: its gitlink changed, a submodule before and after
+  readme_ok=$tuteur_moved
+  while IFS= read -r -d '' meta && IFS= read -r -d '' path; do
+    read -r om nm _ _ _ <<<"${meta#:}"
+    if [ -n "${pattern[$path]:-}" ] && [ "$om" = 160000 ] && [ "$nm" = 160000 ]; then readme_ok=1; fi
+  done < <(git diff --raw --no-abbrev --no-renames -z HEAD "$head")
   while IFS= read -r -d '' meta && IFS= read -r -d '' path; do
     ok=""
     read -r om nm _ _ _ <<<"${meta#:}"
     if [ "$path" = "$FLAKE_NIX" ] || [ "$path" = "$FLAKE_LOCK" ]; then ok=1; fi
     if [ -n "${pattern[$path]:-}" ] && [ "$om" = 160000 ] && [ "$nm" = 160000 ]; then ok=1; fi
-    if [ -n "$tuteur_moved" ] && [ "$path" = "$PATTERNS/README.md" ]; then ok=1; fi
+    if [ -n "$readme_ok" ] && [ "$path" = "$PATTERNS/README.md" ]; then ok=1; fi
     [ -z "$ok" ] || continue
     if [[ $path == .forgejo/* ]]; then workflows+=" $path"; else other+=" $path"; fi
   done < <(git diff --raw --no-abbrev --no-renames -z HEAD "$head")

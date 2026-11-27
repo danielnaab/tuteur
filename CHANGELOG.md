@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- **Each pattern's guide, linked from `.patterns/README.md`.** A provider may ship `USING.md`, its guide for the
+  repositories that use it ([Files: USING.md](docs/reference/files.md#usingmd)). The marker README now ends with a
+  list of the patterns, each linking its `USING.md` at the recorded commit, or its `README.md`, so a consumer's
+  `AGENTS.md` links one file for all of them ([Add your first pattern](docs/guides/add-a-pattern.md#steps),
+  step 6). `add` writes it with the new pattern, `upgrade` writes it again when a pattern moves (not only
+  tuteur's pin), and `tuteur ci pr` accepts the README beside a moved pattern.
+- **`check` compares the marker README.** From the repository's own app, once every pattern is filled:
+  `tuteur: .patterns/README.md is stale or edited: tuteur sync`. Run `tuteur sync` once after taking this
+  version, and move your own text from the README into `AGENTS.md`.
+
 ## v0.1.0 - 2026-11-21
 
 graft is now **tuteur** (say "too-TUR"), in a new repository, `danielnaab/tuteur`, whose versions start again

@@ -248,6 +248,13 @@ Every rule passed, but evaluating the flake's tools or checks failed; the lines 
 the provider ([Fix a provider from a consumer](fix-a-provider.md)), or move the pattern back to a release that
 works: `nix run .#tuteur upgrade NAME@TAG`.
 
+### tuteur: .patterns/README.md is stale or edited: tuteur sync
+
+The patterns README is tuteur's: its rules for the patterns, and a link to each pattern's guide at its recorded
+commit. It is stale after a pattern moved by hand (`git add .patterns/NAME`), and edited when someone wrote in
+it. Run `nix run .#tuteur sync`, which writes it again, then commit it. Put your own rules in `AGENTS.md`.
+Inside a pot run the patterns folder is read-only: run sync on the host.
+
 ### .forgejo/workflows/FILE differs from the copy this tuteur version ships
 
 One of tuteur's workflows was edited, or tuteur's pin moved without a sync. `nix run .#tuteur sync` restores

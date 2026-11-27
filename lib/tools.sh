@@ -226,6 +226,9 @@ cmd_upgrade() {
   # the new tuteur writes its own README and workflows (its refresh.sh, its template)
   if [ -n "$moved_tuteur" ]; then
     TUTEUR_TEMPLATE="" bash "$src/lib/refresh.sh" "$PATTERNS" "$FLAKE" "$TUTEUR_RUN" "$src/template"
+  elif [ -n "$PATTERNS" ] && [ -d "$PATTERNS" ]; then
+    # a moved pattern may have gained or dropped its USING.md: this tuteur's README, never its workflows
+    bash "$here/patterns-readme.sh" write "$PATTERNS" "$TUTEUR_RUN"
   fi
   # the moved patterns' recipes (v2.18.0): from the repository's own app, which knows this tuteur's kits.just
   [ -z "${TUTEUR_IN_REPO:-}" ] || kits_just_write
