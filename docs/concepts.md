@@ -83,7 +83,7 @@ tuteur was graft until v2.22.0. The nouns that changed:
 | a new major version | a breaking version (a new major, or a new `0.y`) |
 | `graft-check.yaml`, `graft-upgrade.yaml`, `graft-signers.yaml` | `tuteur-check.yaml`, `tuteur-upgrade.yaml`, `tuteur-signers.yaml` |
 
-tuteur 0.1.x still reads graft's names; `tuteur check` says which this repository uses, and 0.2.0 drops them
+tuteur 0.2.x still reads graft's names; `tuteur check` says which this repository uses, and 0.3.0 drops them
 ([Move from graft v2](guides/move-from-graft.md)).
 
 ## The git and Nix binding

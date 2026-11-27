@@ -9,7 +9,7 @@ merge it or fix it.
 ## Before you begin
 
 - tuteur's two workflows are in `.forgejo/workflows/`: `tuteur-check.yaml` and `tuteur-upgrade.yaml`.
-  `nix flake init -t github:danielnaab/tuteur/v0.1.0` writes them. If you did not use it, copy tuteur's
+  `nix flake init -t github:danielnaab/tuteur/v0.2.0` writes them. If you did not use it, copy tuteur's
   [template/.forgejo/workflows/](../../template/.forgejo/workflows/) there, and commit them. tuteur keeps
   them current ([Files](../reference/files.md#tuteurs-workflows)).
 - A Forgejo Actions runner has the label `nixos-latest`, mapped to `docker://nixos/nix`. Each job must get a
@@ -18,7 +18,7 @@ merge it or fix it.
   that Forgejo gives each job (`github.token`). If the branch's name is not `main`, change
   `branches: [main]` under `push:` in `tuteur-check.yaml`; tuteur keeps your line
   ([Files](../reference/files.md#the-branches-line)). The commands below say `main`: use your branch's name.
-- For a private repository, add the Actions secret `TUTEUR_PR_TOKEN` (graft's `GRAFT_PR_TOKEN` still works through 0.1.x): a token with the `write:repository`
+- For a private repository, add the Actions secret `TUTEUR_PR_TOKEN` (graft's `GRAFT_PR_TOKEN` still works through 0.2.x): a token with the `write:repository`
   scope, of a user who can write to the repository. A bot account is the best owner, because it becomes the
   pull request's author. A user-level secret covers all that user's repositories.
 - To make your own checks a required status, see
@@ -282,7 +282,7 @@ it. A status `unknown` means that tuteur cannot read the provider's repository.
   each checkout:
 
   ```
-  for r in ~/src/team-kb ~/src/handbook; do echo "$r"; nix run github:danielnaab/tuteur/v0.1.0 -- outdated -C "$r"; done
+  for r in ~/src/team-kb ~/src/handbook; do echo "$r"; nix run github:danielnaab/tuteur/v0.2.0 -- outdated -C "$r"; done
   ```
 
 ## Report who signed each commit

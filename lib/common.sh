@@ -20,7 +20,7 @@
 MARKER="<!-- managed by tuteur: https://github.com/danielnaab/tuteur -->"
 # shellcheck disable=SC2034 # used by the scripts that source this file
 WORKFLOW_MARKER='# managed by tuteur: '
-# graft's markers (graft v2, before the rename), read through 0.1.x: sync rewrites them (tuteur check names them)
+# graft's markers (graft v2, before the rename), read through 0.2.x: sync rewrites them (tuteur check names them)
 OLD_MARKER="<!-- managed by graft: https://github.com/danielnaab/graft -->"
 nix_() { nix --extra-experimental-features 'nix-command flakes' "$@"; }
 # nix_clean ARGS: nix_ through an empty fetch cache of this run's own (XDG_CACHE_HOME in TUTEUR_TMP), and without the
@@ -41,13 +41,13 @@ trap 'rm -rf "$TUTEUR_TMP"' EXIT
 
 die() { echo "tuteur: $*" >&2; exit 1; }
 
-# alias_line THING WHAT: one line, never a failure, for a name of graft's that tuteur 0.1.x still reads
-alias_line() { echo "tuteur: $1 is graft's name; 0.2.0 drops it: $2" >&2; }
+# alias_line THING WHAT: one line, never a failure, for a name of graft's that tuteur 0.2.x still reads
+alias_line() { echo "tuteur: $1 is graft's name; 0.3.0 drops it: $2" >&2; }
 
 # tuteur try's marker, at the repo's top: a file marked with intent to add, so that Nix reads the
 # working tree (a tracked file differs from HEAD)
 TRY=.tuteur-try
-# graft's (graft v2): check fails on it too, through 0.1.x
+# graft's (graft v2): check fails on it too, through 0.2.x
 # shellcheck disable=SC2034 # used by the scripts that source this file
 OLD_TRY=.graft-try
 # try_state (from the top): "on" while the index holds the marker and HEAD doesn't; "committed" when
@@ -62,7 +62,7 @@ try_state() {
 }
 
 # provider_file PATH: the provider file of the pattern at PATH: PATH/tuteur.nix, else PATH/graft.nix (graft v2's name,
-# read through 0.1.x); fails when it has neither
+# read through 0.2.x); fails when it has neither
 provider_file() {
   if [ -f "$1/tuteur.nix" ]; then echo "$1/tuteur.nix"; elif [ -f "$1/graft.nix" ]; then echo "$1/graft.nix"; else return 1; fi
 }

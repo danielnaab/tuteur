@@ -18,9 +18,9 @@ works when they are empty, fill them where it matters, and set up your machine s
 
 | Use | Empty patterns |
 |---|---|
-| A top-level git flake: `nix build .#tools`, `nix flake check`, `nix run .#tuteur …`, with no tracked file modified | Works, if every pattern's commit is on its provider's remote: Nix fetches each pattern at its gitlink from the URL in `.gitmodules`, before tuteur runs. Otherwise `nix run github:danielnaab/tuteur/v0.1.0 -- check -C .` still runs. |
+| A top-level git flake: `nix build .#tools`, `nix flake check`, `nix run .#tuteur …`, with no tracked file modified | Works, if every pattern's commit is on its provider's remote: Nix fetches each pattern at its gitlink from the URL in `.gitmodules`, before tuteur runs. Otherwise `nix run github:danielnaab/tuteur/v0.2.0 -- check -C .` still runs. |
 | The same, after any tracked file is modified (an agent's first edit, a CI step that writes a file) | Fails inside Nix: `error: Failed to fetch git repository '…/patterns/NAME'`. Nix reads the working tree, and the pattern is empty. `nix run .#tuteur sync` cannot run either, because the flake does not evaluate: run `git submodule update --init --recursive` first. |
-| `nix run github:danielnaab/tuteur/v0.1.0 -- outdated -C .` and the other `-C` commands | Works: tuteur reads `.gitmodules` and the gitlinks. |
+| `nix run github:danielnaab/tuteur/v0.2.0 -- outdated -C .` and the other `-C` commands | Works: tuteur reads `.gitmodules` and the gitlinks. |
 | A `path:` flake in a subdirectory | `tools` builds without the empty patterns, with a warning; a provider that needs one fails. Fill the patterns first. |
 | Reading a pattern's files, agents following them, `PYTHONPATH=.patterns/…` | Nothing to read. Fill the patterns first. |
 | `just` with `import? ".patterns/…"` | Lists your own recipes, without the provider's. With `import` (no `?`), `just` fails to parse. |

@@ -9,8 +9,8 @@ owns, are listed in [pot's contracts](https://github.com/danielnaab/pot/blob/v0.
 
 | | |
 |---|---|
-| Version | 3. provider/2 is graft's `graft.nix`, which tuteur 0.1.x still reads (below). A breaking change to this contract is provider/4, in a breaking version of tuteur. |
-| Producer | a provider's `tuteur.nix`, at the top of its repository (else its `graft.nix`, through 0.1.x) |
+| Version | 3. provider/2 is graft's `graft.nix`, which tuteur 0.2.x still reads (below). A breaking change to this contract is provider/4, in a breaking version of tuteur. |
+| Producer | a provider's `tuteur.nix`, at the top of its repository (else its `graft.nix`, through 0.2.x) |
 | Reader | tuteur's mkFlake, in each consumer, once per system |
 | Owner | tuteur |
 
@@ -35,7 +35,7 @@ owns, are listed in [pot's contracts](https://github.com/danielnaab/pot/blob/v0.
 | `pkgs`, `lib`, `system` | nixpkgs, its lib, a system string | the consumer's `inputs.nixpkgs` if it has one, else tuteur's |
 | `pattern` | a store path | this pattern alone, without its `.git` file |
 | `patterns` | attrs | every pattern of the consumer: its store path as `outPath`, merged with its `tuteur.nix` result |
-| `scion`, `scions` | | provider/2's names for `pattern` and `patterns`, passed beside them through 0.1.x. A function that names only `scion` or `scions` gets only those two; one that names only `pattern` or `patterns`, only the new two; any other gets all four. |
+| `scion`, `scions` | | provider/2's names for `pattern` and `patterns`, passed beside them through 0.2.x. A function that names only `scion` or `scions` gets only those two; one that names only `pattern` or `patterns`, only the new two; any other gets all four. |
 | `consumer` | a store path | the consumer flake's source |
 | `kitArgs` | attrs | the consumer's `perSystem.kitArgs.<pattern>`, or `{ }`. Passed only when the function names it. |
 
@@ -59,8 +59,8 @@ consumer's `pot-kits` build with `pot: <dir>/<pattern>/tuteur.nix: <field> is no
 ## Compatibility
 
 - **Arguments are added, never removed within a version.** A provider takes `...`, so a later tuteur can pass
-  more. provider/3 renamed provider/2's `scion` and `scions`; 0.1.x passes both, and 0.2.0 drops the old two.
-- **`graft.nix`** (provider/2's file) is read when the provider has no `tuteur.nix`, through 0.1.x; `tuteur check`
+  more. provider/3 renamed provider/2's `scion` and `scions`; 0.2.x passes both, and 0.3.0 drops the old two.
+- **`graft.nix`** (provider/2's file) is read when the provider has no `tuteur.nix`, through 0.2.x; `tuteur check`
   names it. A provider can ship both files meanwhile: tuteur reads `tuteur.nix`, graft reads `graft.nix`. pot
   protects both names in a run.
 - **Every attribute is optional.** A missing one is empty.

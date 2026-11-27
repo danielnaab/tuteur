@@ -98,7 +98,7 @@ checkout's working tree as a `path:` input, and a tarball of it as a `tarball+fi
 mkFlake (discovery, isolation, siblings, collisions, the evaluation errors), the Nix fetch rules that tuteur
 depends on, the seam between mkFlake and pot's `kitsFor` (`kits`), `add`, `sync`, `check` (one fixture per rule),
 `outdated`, `status`, `changelog`, `upgrade` (with a `0.y` series), tuteur's own pin (`tuteur`), `migrate`, `ci`
-against a local origin and a stub API, the workflows, graft's names that 0.1.x reads (`aliases`), and a consumer of
+against a local origin and a stub API, the workflows, graft's names that 0.2.x reads (`aliases`), and a consumer of
 graft v2.22.0 moved by [Move from graft v2](guides/move-from-graft.md) (`fromgraft`). `own` checks tuteur's own
 flake: no `inputs.self.submodules`, no pot in its lock, the command unchanged by an edit to mkFlake, and the docs
 check. It takes several minutes and fetches nixpkgs on its first run. Do not

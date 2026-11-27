@@ -251,7 +251,7 @@ sec_mkflake() {
   printf '{ pkgs, ... }: { tools.x = pkgs.hello;\n' > "$work/src/bad/tuteur.nix" && release bad v1.0.1
   git_ -C .patterns/bad fetch -q --tags && git_ -C .patterns/bad checkout -q --detach v1.0.1 && commit "bad v1.0.1"
   refused "check: a tuteur.nix that doesn't parse, from tuteur's own flake" G check -C .
-  expect "names it" holds "tuteur: .patterns/bad/tuteur.nix doesn't evaluate (above): every output of this flake fails until it does, tuteur's own app too; move the pattern back (git submodule update --recursive -- .patterns/bad), or from outside: nix run github:danielnaab/tuteur/v0.1.0 -- upgrade -C . bad@TAG"
+  expect "names it" holds "tuteur: .patterns/bad/tuteur.nix doesn't evaluate (above): every output of this flake fails until it does, tuteur's own app too; move the pattern back (git submodule update --recursive -- .patterns/bad), or from outside: nix run github:danielnaab/tuteur/v0.2.0 -- upgrade -C . bad@TAG"
   git_ rm -q .patterns/bad && commit "no bad"
 
   # a pattern with no tuteur.nix, and one with its own pinned source
@@ -1558,7 +1558,7 @@ EOF
   cd "$work"
 }
 
-# aliases: graft's names, which tuteur 0.1.x reads (and 0.2.0 drops): the input name graft (read through 0.x), the
+# aliases: graft's names, which tuteur 0.2.x reads (and 0.3.0 drops): the input name graft (read through 0.x), the
 # app graft, scions/ as the folder when mkFlake has no dir, graft's marker README, graft.nix and its arguments scion
 # and scions, marked graft-*.yaml workflows and the "# graft ssh:" line (sync renames and rewrites them),
 # .graft-try and --scions. tuteur check names each one in use, in one line that never fails it.
@@ -1585,12 +1585,12 @@ EOF
   expect "and a sibling, by scions" has "policy v1"
   ran "aliases: check, through the app graft" nix run .#graft -- check
   expect "passes" has "tuteur: 2 patterns clean and at release tags"
-  expect "names the app" holds "tuteur: the app graft (nix run .#graft) is graft's name; 0.2.0 drops it: run nix run .#tuteur"
-  expect "names the marker" holds "tuteur: the marker in scions/README.md is graft's name; 0.2.0 drops it: tuteur sync rewrites it"
-  expect "names the workflow" holds "tuteur: .forgejo/workflows/graft-check.yaml is graft's name; 0.2.0 drops it: tuteur sync renames it to .forgejo/workflows/tuteur-check.yaml"
-  expect "names the folder" holds "tuteur: the folder scions/, which mkFlake finds without dir, is graft's name; 0.2.0 drops it: keep it with dir = \"scions\"; in mkFlake, or move it to .patterns/ (0.2.0's Upgrading steps)"
-  expect "names the provider file" holds "tuteur: scions/ol/graft.nix is graft's name; 0.2.0 drops it: the provider ships tuteur.nix"
-  expect "names the arguments" holds "tuteur: each of scion and scions, in scions/ol/graft.nix's arguments, is graft's name; 0.2.0 drops it: name them pattern and patterns"
+  expect "names the app" holds "tuteur: the app graft (nix run .#graft) is graft's name; 0.3.0 drops it: run nix run .#tuteur"
+  expect "names the marker" holds "tuteur: the marker in scions/README.md is graft's name; 0.3.0 drops it: tuteur sync rewrites it"
+  expect "names the workflow" holds "tuteur: .forgejo/workflows/graft-check.yaml is graft's name; 0.3.0 drops it: tuteur sync renames it to .forgejo/workflows/tuteur-check.yaml"
+  expect "names the folder" holds "tuteur: the folder scions/, which mkFlake finds without dir, is graft's name; 0.3.0 drops it: keep it with dir = \"scions\"; in mkFlake, or move it to .patterns/ (0.3.0's Upgrading steps)"
+  expect "names the provider file" holds "tuteur: scions/ol/graft.nix is graft's name; 0.3.0 drops it: the provider ships tuteur.nix"
+  expect "names the arguments" holds "tuteur: each of scion and scions, in scions/ol/graft.nix's arguments, is graft's name; 0.3.0 drops it: name them pattern and patterns"
   refuse "and not the input name graft (read through 0.x)" holds "input"
   ran "aliases: outdated reads tuteur's own input by graft's name" nix run .#tuteur -- outdated
   expect "a row named graft" grep -qE "^graft +- +path +- +untagged" <<<"$out"
@@ -1624,7 +1624,7 @@ EOF
   # add --scions
   prov alq && release alq v1.0.0
   ran "aliases: add --scions" nix run .#tuteur -- add --scions scions "$(url alq)"
-  expect "names it" holds "tuteur: --scions is graft's name; 0.2.0 drops it: use --dir"
+  expect "names it" holds "tuteur: --scions is graft's name; 0.3.0 drops it: use --dir"
   expect "and adds" test -f scions/alq/README.md
   cd "$work"
 }

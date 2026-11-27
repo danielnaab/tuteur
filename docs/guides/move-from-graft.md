@@ -11,11 +11,11 @@ input keeps its name, `graft`, so nothing else in your flake changes.
 
 - The repository is at graft v2.22.0 (`nix run .#graft outdated` lists `graft` at `v2.22.0`), and
   `nix run .#graft check` passes. Take v2.22.0 first if you are behind: it is an ordinary v2 release.
-- tuteur 0.1.x still reads graft's names: the input name `graft`, the app `graft`, `scions/` or `.scions/` as the
+- tuteur 0.2.x still reads graft's names: the input name `graft`, the app `graft`, `scions/` or `.scions/` as the
   folder, graft's marker README, a provider's `graft.nix`, its arguments `scion` and `scions`, and `.graft-try`.
-  `tuteur check` prints one line for each one in use, and never fails on it. tuteur 0.2.0 drops them, except the
+  `tuteur check` prints one line for each one in use, and never fails on it. tuteur 0.3.0 drops them, except the
   input name `graft`, which every 0.x reads.
-- This pull request does not move the folder. Keep `scions/` (or `.scions/`) for now: tuteur 0.2.0's Upgrading
+- This pull request does not move the folder. Keep `scions/` (or `.scions/`) for now: tuteur 0.3.0's Upgrading
   steps move it to `.patterns/`.
 - If any agent or kit command runs under pot here (the repository has kits, a `kits.just`, or agents run in it),
   the consumer now takes pot as an input of its own. Your root moves to pot 0.1.0 first
@@ -28,12 +28,12 @@ input keeps its name, `graft`, so nothing else in your flake changes.
 1. On a new branch, change the input's URL in `flake.nix`, and, under pot, add pot:
 
    ```nix
-   inputs.graft.url = "github:danielnaab/tuteur/v0.1.0";
-   inputs.pot.url = "github:danielnaab/pot/v0.1.0";     # only where agents or kit commands run under pot
+   inputs.graft.url = "github:danielnaab/tuteur/v0.2.0";
+   inputs.pot.url = "github:danielnaab/pot/v0.3.0";     # only where agents or kit commands run under pot
    ```
 
    A `git+https://…/graft?ref=refs/tags/vX&exportIgnore=1` URL becomes
-   `git+https://…/tuteur?ref=refs/tags/v0.1.0&exportIgnore=1` the same way. Keep the name `graft`. Then lock,
+   `git+https://…/tuteur?ref=refs/tags/v0.2.0&exportIgnore=1` the same way. Keep the name `graft`. Then lock,
    through an empty fetch cache:
 
    ```
@@ -69,7 +69,7 @@ input keeps its name, `graft`, so nothing else in your flake changes.
    `check` passes, and names the graft names still in use, such as:
 
    ```
-   tuteur: the folder scions/, which mkFlake finds without dir, is graft's name; 0.2.0 drops it: keep it with dir = "scions"; in mkFlake, or move it to .patterns/ (0.2.0's Upgrading steps)
+   tuteur: the folder scions/, which mkFlake finds without dir, is graft's name; 0.3.0 drops it: keep it with dir = "scions"; in mkFlake, or move it to .patterns/ (0.3.0's Upgrading steps)
    tuteur: 1 pattern clean and at release tags
    ```
 
@@ -93,7 +93,7 @@ nix run .#tuteur outdated
 nix run .#tuteur check
 ```
 
-`outdated` lists `graft` at `v0.1.0` (the input's name, tuteur's version). `check` passes. The next weekly
+`outdated` lists `graft` at `v0.2.0` (the input's name, tuteur's version). `check` passes. The next weekly
 `tuteur-upgrade` run takes tuteur's and pot's 0.1.x patches by itself, and holds 0.2.0 for a person.
 
 ## If something goes wrong
@@ -112,7 +112,7 @@ again (graft's repository stays, archived), and the workflows and README are gra
 
 tuteur 0.1.0 is graft's code with graft's names changed and pot taken out; its version line starts again at 0.1.0,
 in a new repository with no `v2.*` tags, so `outdated` compares it only with tuteur's own releases. The weekly job
-can't make this move: the URL changes, `v0.1.0` is not newer than `v2.22.0`, and `ci pr` never opens a pull
+can't make this move: the URL changes, `v0.2.0` is not newer than `v2.22.0`, and `ci pr` never opens a pull
 request that changes `.forgejo/`. So each consumer moves by a person's pull request.
 
 ## Related

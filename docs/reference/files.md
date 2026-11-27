@@ -63,7 +63,7 @@ subdirectory too.
 - **`check` compares the text** from the repository's own app (`nix run .#tuteur check`), not with
   `--committed`, and only when every pattern is filled: an empty pattern's guide can't be told. A difference
   fails: `tuteur: .patterns/README.md is stale or edited: tuteur sync`. A README with graft's marker is not
-  compared through 0.1.x: `check` names it, and `sync` rewrites it.
+  compared through 0.2.x: `check` names it, and `sync` rewrites it.
 - **An empty pattern stops a write.** `add`, `sync` and `upgrade` leave the file as it is and say so:
   `tuteur: .patterns/README.md: not written: .patterns/x is empty (tuteur sync fills it)`.
 - **Your own rules go in your `AGENTS.md`,** not here: link this README from it, and add what is yours, such as
@@ -74,7 +74,7 @@ subdirectory too.
 - **Other tools skip the directory by it.** knowledge-base-kit's checkers (`kb_linter`, `link_validator`)
   do not walk a directory whose `README.md` has the marker, so they do not check providers' tests and
   fixtures.
-- graft's marker, `<!-- managed by graft: https://github.com/danielnaab/graft -->`, is read through 0.1.x;
+- graft's marker, `<!-- managed by graft: https://github.com/danielnaab/graft -->`, is read through 0.2.x;
   `sync` rewrites it, and `check` names it until then.
 - graft v2.12.0 and earlier wrote a table of scions and a second line, `<!-- graft flake: DIR -->`. Both are gone;
   every command refuses them, naming graft's Upgrading steps.
@@ -196,7 +196,7 @@ A function, called once per system by the consumer's mkFlake. Its versioned cont
 ```
 
 **Arguments.** Always passed, except `kitArgs`. Take `...`, so that a later tuteur version can add one. Through
-0.1.x, graft's `scion` and `scions` are passed beside `pattern` and `patterns` ([provider/3](provider.md)), and a
+0.2.x, graft's `scion` and `scions` are passed beside `pattern` and `patterns` ([provider/3](provider.md)), and a
 pattern with no `tuteur.nix` has its `graft.nix` read.
 
 | Argument | Value |
@@ -266,7 +266,7 @@ tuteur renders its own copy with the lines that are yours: `branches:`, `paths-i
   ([Keep your own edits to a workflow](#keep-your-own-edits-to-a-workflow)).
 - tuteur never adds a workflow that you did not copy in.
 - graft's workflows, `graft-check.yaml`, `graft-upgrade.yaml` and `graft-signers.yaml` with graft's marker
-  (`# managed by graft: …`), are tuteur's to rename through 0.1.x: `sync` moves each to its `tuteur-` name, then
+  (`# managed by graft: …`), are tuteur's to rename through 0.2.x: `sync` moves each to its `tuteur-` name, then
   renders it with the lines that are yours (`tuteur: renamed .forgejo/workflows/graft-check.yaml to
   .forgejo/workflows/tuteur-check.yaml`); `check` names one that is still there. The workflow's name, and so its
   status context, changes too (`tuteur-check / patterns`): edit a branch rule that requires `graft-check / …`.
@@ -276,7 +276,7 @@ The workflows find the flake from the marker README: its directory's parent; two
 `path:$PWD/DIR`, and the check and upgrade jobs first fill its patterns (`git submodule update -q --init -- DIR`),
 because a `path:` flake reads the working tree. A top-level git flake does not need that: Nix fetches the
 patterns itself. tuteur-check's job is `patterns`, and its step is named `Patterns registered and at release tags`.
-The workflows also find graft's marker README, through 0.1.x. tuteur-upgrade's pull request step reads the token
+The workflows also find graft's marker README, through 0.2.x. tuteur-upgrade's pull request step reads the token
 `secrets.TUTEUR_PR_TOKEN || secrets.GRAFT_PR_TOKEN || github.token`, and pushes the branch `tuteur/upgrade`.
 
 `tuteur-signers.yaml` (since graft v2.21.0) runs [`ci signers`](commands.md#ci) on each push to the default branch and
@@ -342,7 +342,7 @@ on:
 ### The tuteur ssh line
 
 One comment line, for a private pattern that only an ssh key can read. graft's form, `# graft ssh: …`, is read
-through 0.1.x, and `sync` writes it as `# tuteur ssh: …`
+through 0.2.x, and `sync` writes it as `# tuteur ssh: …`
 ([Add a private provider](../guides/private-providers.md)), in either workflow file. tuteur keeps it above
 `name:`, and renders a step that installs the key before each step that runs tuteur: tuteur-check's check, and
 tuteur-upgrade's upgrade and pr steps. In a file whose copy has no such step, the check fails with

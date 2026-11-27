@@ -109,7 +109,7 @@ Compared with the other ways:
 Nix 2.27 or later, with flakes. In a git repository:
 
 ```
-nix flake init -t github:danielnaab/tuteur/v0.1.0
+nix flake init -t github:danielnaab/tuteur/v0.2.0
 ```
 
 It writes tuteur's CI workflows and this `flake.nix`:
@@ -117,9 +117,9 @@ It writes tuteur's CI workflows and this `flake.nix`:
 ```nix
 {
   inputs.self.submodules = true;
-  inputs.tuteur.url = "github:danielnaab/tuteur/v0.1.0";
+  inputs.tuteur.url = "github:danielnaab/tuteur/v0.2.0";
   # Where agents or kit commands run under pot, take pot too (mkFlake then builds pot-kits):
-  #   inputs.pot.url = "github:danielnaab/pot/v0.1.0";
+  #   inputs.pot.url = "github:danielnaab/pot/v0.3.0";
   outputs = inputs: inputs.tuteur.lib.mkFlake { inherit inputs; };
 }
 ```

@@ -42,7 +42,7 @@ provider's wiring, and the consumer's.
 2. In a consumer that runs under pot, take pot, and lock it:
 
    ```nix
-   inputs.pot.url = "github:danielnaab/pot/v0.1.0";
+   inputs.pot.url = "github:danielnaab/pot/v0.3.0";
    ```
 
    ```

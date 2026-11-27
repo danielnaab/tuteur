@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## v0.2.0 - 2026-11-27
+
+A breaking version: `check` now fails on an edited or stale `.patterns/README.md`, so the weekly upgrade holds this
+version for a person. graft's names are still read, as in 0.1.x; their removal moves to 0.3.0, and `check`'s line
+for each one now says so.
 
 - **Each pattern's guide, linked from `.patterns/README.md`.** A provider may ship `USING.md`, its guide for the
   repositories that use it ([Files: USING.md](docs/reference/files.md#usingmd)). The marker README now ends with a
@@ -11,6 +15,20 @@
 - **`check` compares the marker README.** From the repository's own app, once every pattern is filled:
   `tuteur: .patterns/README.md is stale or edited: tuteur sync`. Run `tuteur sync` once after taking this
   version, and move your own text from the README into `AGENTS.md`.
+- **`ci signers` reports who signed and who pushed each release tag.** For a tag push, the summary names the tag,
+  its target, the verified principal of any class (or `lightweight`, `unsigned`, `unverified`) and the pushing
+  account. Any recognized signer may sign a tag, an agent key too; a lightweight, unsigned or unverifiable tag gets
+  a warning ([ci signers](docs/reference/commands.md#ci)).
+- **pot v0.3.0** in the template's commented `inputs.pot`, mkFlake's messages and the guides (was v0.1.0).
+
+### Upgrading
+
+1. Take this version by name: `nix run .#tuteur upgrade tuteur@v0.2.0` (the weekly job holds it). It writes
+   `.patterns/README.md` again.
+2. If you had written your own text into `.patterns/README.md`, move it into `AGENTS.md` (or another file of
+   yours), and link `.patterns/README.md` from `AGENTS.md` for the patterns' guides. Then run `nix run .#tuteur sync`.
+3. Done when `nix run .#tuteur check` passes. Lines saying `… is graft's name; 0.3.0 drops it` are not failures:
+   follow each before 0.3.0.
 
 ## v0.1.0 - 2026-11-21
 

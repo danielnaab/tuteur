@@ -49,7 +49,7 @@ set -euo pipefail
 mode=$1 repo=$2 examples=$3 run=${4:-nix run .#tuteur} flakedir=${5:-.}
 shift $(($# < 5 ? $# : 5))
 marker='# managed by tuteur: '   # also lib/common.sh's WORKFLOW_MARKER, which says why there are copies
-old_marker='# managed by graft: '   # graft v2's, read through 0.1.x: refresh renames graft-NAME.yaml and rewrites it
+old_marker='# managed by graft: '   # graft v2's, read through 0.2.x: refresh renames graft-NAME.yaml and rewrites it
 rc=0
 case $mode in check|refresh) ;; *) echo "usage: workflows.sh check|refresh REPO EXAMPLES [RUN [FLAKEDIR [DIR...]]]" >&2; exit 2 ;; esac
 
@@ -213,7 +213,7 @@ ssh_line() {
 # ssh_step: the step a `# tuteur ssh:` line asks for (ssh_parse's fields), and a blank line after it
 ssh_step() {
   local cfg="'Host $SSH_ALIAS'" names=$SSH_HOST secret="secrets.$SSH_SECRET" what="the $SSH_SECRET secret"
-  # the default secret, TUTEUR_SSH_KEY, else graft's GRAFT_SSH_KEY (an org setting, read through 0.1.x)
+  # the default secret, TUTEUR_SSH_KEY, else graft's GRAFT_SSH_KEY (an org setting, read through 0.2.x)
   if [ "$SSH_SECRET" = TUTEUR_SSH_KEY ]; then secret="secrets.TUTEUR_SSH_KEY || secrets.GRAFT_SSH_KEY" what="the TUTEUR_SSH_KEY secret (or GRAFT_SSH_KEY)"; fi
   # ssh looks the key up under the name it connects to: with an address, that's the address
   if [ -n "$SSH_ADDR" ]; then cfg+=" '  HostName $SSH_ADDR'" names+=",${SSH_HOST/"$SSH_ALIAS"/"$SSH_ADDR"}"; fi

@@ -274,7 +274,7 @@ pr() {
 #   - a change to a protected path ($TUTEUR_SIGNERS_PERSON: shell patterns, where * also matches /) is signed by
 #     a @person key.
 # A tag: report the peeled target, verified SSH principal (any class) and PUSH_ACTOR from the forge separately.
-# (graft's names, GRAFT_SIGNERS_*, are read when the new ones are not set: through 0.1.x)
+# (graft's names, GRAFT_SIGNERS_*, are read when the new ones are not set: through 0.2.x)
 TUTEUR_SIGNERS_FILE=${TUTEUR_SIGNERS_FILE:-${GRAFT_SIGNERS_FILE:-.forgejo/allowed_signers}}
 TUTEUR_SIGNERS_PERSON=${TUTEUR_SIGNERS_PERSON:-${GRAFT_SIGNERS_PERSON:-"grants.json */grants.json .forgejo/allowed_signers AGENTS.md */AGENTS.md CLAUDE.md */CLAUDE.md .claude/* */.claude/* .pi/* */.pi/*"}}
 TUTEUR_SIGNERS_MAX=${TUTEUR_SIGNERS_MAX:-${GRAFT_SIGNERS_MAX:-100}}

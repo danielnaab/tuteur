@@ -35,7 +35,7 @@
       mkFlake = import ./lib/mk-flake.nix { inherit nixpkgs systems cli; };
       # an output that went to pot's flake (github:danielnaab/pot) with graft v2's split: an error naming where
       moved = name: there: throw ("tuteur: ${name} is pot's, not tuteur's (tuteur re-exports nothing of pot's): "
-        + "take pot as an input of its own, inputs.pot.url = \"github:danielnaab/pot/v0.1.0\";, and use ${there}");
+        + "take pot as an input of its own, inputs.pot.url = \"github:danielnaab/pot/v0.3.0\";, and use ${there}");
     in
     {
       lib.mkFlake = mkFlake;
@@ -68,7 +68,7 @@
         description = "A repository held to other repositories' patterns, with tuteur's Forgejo workflows";
         welcomeText = ''
           Add a first pattern (a git submodule at its newest release tag), then commit:
-            nix run github:danielnaab/tuteur/v0.1.0 -- add -C . URL
+            nix run github:danielnaab/tuteur/v0.2.0 -- add -C . URL
           See https://github.com/danielnaab/tuteur.
         '';
       };

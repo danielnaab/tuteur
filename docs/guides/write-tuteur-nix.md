@@ -110,7 +110,7 @@ their flake, with no Nix code of theirs: one `tuteur.nix` at the top of your rep
 
    For a flake in a subdirectory, `try` prints `'path:DIR#…'` commands and changes nothing: a `path:` flake
    reads its working tree on every build. If `nix run .#tuteur` fails (your `tuteur.nix` does not parse, say),
-   run `nix run github:danielnaab/tuteur/v0.1.0 -- try -C .` instead.
+   run `nix run github:danielnaab/tuteur/v0.2.0 -- try -C .` instead.
 
 5. Check the contract in your own flake ([below](#check-the-contract-before-you-tag)), and run
    `nix flake check` there.
@@ -120,7 +120,7 @@ their flake, with no Nix code of theirs: one `tuteur.nix` at the top of your rep
    or changing a settings file's shape is a major version.
 
    A provider that shipped graft's `graft.nix` renames it to `tuteur.nix`, and its arguments `scion` and `scions`
-   to `pattern` and `patterns` ([provider/3](../reference/provider.md)). tuteur 0.1.x still reads `graft.nix`
+   to `pattern` and `patterns` ([provider/3](../reference/provider.md)). tuteur 0.2.x still reads `graft.nix`
    and passes the old names, so a release can ship both files while consumers move from graft.
 
 ## Check the contract before you tag
@@ -139,7 +139,7 @@ So evaluate `tuteur.nix` in your own flake, the way a consumer does, and assert 
 ```nix
 {
   inputs.self.submodules = true;
-  inputs.tuteur.url = "github:danielnaab/tuteur/v0.1.0";
+  inputs.tuteur.url = "github:danielnaab/tuteur/v0.2.0";
   outputs = { self, tuteur, ... }@inputs: tuteur.lib.mkFlake {
     inherit inputs;
     perSystem = { pkgs, lib, system, patterns, ... }:

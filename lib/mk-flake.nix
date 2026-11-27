@@ -59,13 +59,13 @@ let
   kitsFor = inputs.pot.lib.pot.kitsFor or null;
   hasPot = kitsFor != null;
   # the first line of the patterns README (lib/tuteur.sh writes it); also lib/common.sh's MARKER. graft's (graft
-  # v2) is read through 0.1.x: tuteur sync rewrites it
+  # v2) is read through 0.2.x: tuteur sync rewrites it
   marker = "<!-- managed by tuteur: https://github.com/danielnaab/tuteur -->";
   oldMarker = "<!-- managed by graft: https://github.com/danielnaab/graft -->";
   marked = t: lib.hasInfix marker t || lib.hasInfix oldMarker t;
   markedDir = d: let f = "${src}/${d}/README.md"; in builtins.pathExists f && marked (builtins.readFile f);
 
-  # the patterns folder: dir, else .patterns; through 0.1.x, with no dir and no .patterns, graft's default
+  # the patterns folder: dir, else .patterns; through 0.2.x, with no dir and no .patterns, graft's default
   # (scions, or .scions) when it holds the marked README (an alias: tuteur check names it)
   oldDir = lib.findFirst markedDir null (lib.optionals (dir == null && !(builtins.pathExists "${src}/.patterns")) [ "scions" ".scions" ]);
   folder = if dir != null then dir else if oldDir != null then oldDir else ".patterns";
@@ -127,7 +127,7 @@ let
   ok = x: if problems == [ ] then x else throw (lib.concatStringsSep "\n" problems);
   emptyMsg = ns: why: "tuteur: ${paths ns} ${if lib.length ns == 1 then "is" else "are"} empty in the flake's source${why}: run git submodule update --init --recursive (or tuteur sync)${lib.optionalString hasGitmodules github}";
 
-  # a provider's file: tuteur.nix, else graft.nix (graft v2's name, read through 0.1.x: tuteur check names it)
+  # a provider's file: tuteur.nix, else graft.nix (graft v2's name, read through 0.2.x: tuteur check names it)
   providerFile = n: if builtins.pathExists "${root}/${n}/tuteur.nix" then "tuteur.nix"
     else if builtins.pathExists "${root}/${n}/graft.nix" then "graft.nix" else null;
   providers = lib.filter (n: !(isEmpty n) && providerFile n != null) names;
@@ -147,7 +147,7 @@ let
       pkgs = (inputs.nixpkgs or nixpkgs).legacyPackages.${system};
       args = { inherit pkgs system; lib = pkgs.lib; };
       # the names a function is called with: pattern and patterns, and graft's scion and scions (provider/2, read
-      # through 0.1.x); a function that names only one pair gets only that pair, so one with no `...` still works
+      # through 0.2.x); a function that names only one pair gets only that pair, so one with no `...` still works
       named = f: one: let fa = builtins.functionArgs f;
           old = fa ? scion || fa ? scions; new = fa ? pattern || fa ? patterns; in
         lib.optionalAttrs (old || !new) ({ scions = siblings; } // lib.optionalAttrs (one != null) { scion = one; })
@@ -209,11 +209,11 @@ let
         else lib.warn (emptyMsg empty ", so the tools leave out what ${if lib.length empty == 1 then "it gives" else "they give"}") x;
       toolsUnwrapped = ok (if reserved != [ ] then throw (lib.concatStringsSep "\n" reserved)
         else warnEmpty (pkgs.buildEnv { name = "tools"; paths = lib.attrValues tools; passthru = { inherit tuteurAliases; }; }));
-      # graft's names in use that 0.1.x still reads, for tuteur check's lines (lib/patterns.sh aliases_in_use)
+      # graft's names in use that 0.2.x still reads, for tuteur check's lines (lib/patterns.sh aliases_in_use)
       argNames = f: lib.filter (a: (builtins.functionArgs f) ? ${a}) [ "scion" "scions" ];
       tuteurAliases = lib.optional (oldDir != null) {
           thing = "the folder ${folder}/, which mkFlake finds without dir,";
-          todo = "keep it with dir = \"${folder}\"; in mkFlake, or move it to .patterns/ (0.2.0's Upgrading steps)"; }
+          todo = "keep it with dir = \"${folder}\"; in mkFlake, or move it to .patterns/ (0.3.0's Upgrading steps)"; }
         ++ map (n: { thing = fileOf n; todo = "the provider ships tuteur.nix (ask its maintainers; it can ship both meanwhile)"; })
           (lib.filter (n: providerFile n == "graft.nix") providers)
         ++ lib.concatMap (n: let f = if n == "self" then perSystem else import "${copies.${n}}/${providerFile n}"; a = argNames f; in
@@ -241,7 +241,7 @@ let
       warnKits = x: if kitUnits == { } then x
         else lib.warn ("tuteur: ${lib.concatMapStringsSep ", " kitFile (lib.attrNames kitUnits)} declare${lib.optionalString (lib.length (lib.attrNames kitUnits) == 1) "s"} a kit for pot, "
           + "but this flake has no inputs.pot: no packages.<system>.pot-kits, so no run applies ${if lib.length (lib.attrNames kitUnits) == 1 then "it" else "them"}; "
-          + "add inputs.pot.url = \"github:danielnaab/pot/v0.1.0\"; to use pot") x;
+          + "add inputs.pot.url = \"github:danielnaab/pot/v0.3.0\"; to use pot") x;
       potKits = ok (kitsFor {
         inherit pkgs;
         self = kitUnits.self or null;
@@ -298,11 +298,11 @@ let
         program = lib.getExe (cli pkgs { TUTEUR_DIR = folder; TUTEUR_IN_REPO = "1"; });
         meta.description = "tuteur: add, sync, check, outdated, upgrade, changelog, migrate, ci";
       };
-      # graft's name, for the workflows and recipes that run nix run .#graft: through 0.1.x (tuteur check names it)
+      # graft's name, for the workflows and recipes that run nix run .#graft: through 0.2.x (tuteur check names it)
       graft = {
         type = "app";
         program = lib.getExe (cli pkgs { TUTEUR_DIR = folder; TUTEUR_IN_REPO = "1"; TUTEUR_VIA = "graft"; });
-        meta.description = "tuteur, by graft's name (0.2.0 drops it): nix run .#tuteur";
+        meta.description = "tuteur, by graft's name (0.3.0 drops it): nix run .#tuteur";
       };
     };
 in

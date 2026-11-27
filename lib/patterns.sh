@@ -357,7 +357,7 @@ cmd_check() {
         # a tuteur.nix that doesn't parse breaks every output of the flake, tuteur's app too
         if pf=$(provider_file "$path") && ! err=$(nix_ eval --impure --expr "builtins.isFunction (import $(pwd -P)/$pf)" 2>&1); then
           echo "$err" | tail -5 >&2
-          bad "$pf doesn't evaluate (above): every output of this flake fails until it does, tuteur's own app too; move the pattern back (git submodule update --recursive -- $path), or from outside: nix run github:danielnaab/tuteur/v0.1.0 -- upgrade -C . $name@TAG"
+          bad "$pf doesn't evaluate (above): every output of this flake fails until it does, tuteur's own app too; move the pattern back (git submodule update --recursive -- $path), or from outside: nix run github:danielnaab/tuteur/v0.2.0 -- upgrade -C . $name@TAG"
         fi
       fi
     done <<<"$registered"
@@ -399,7 +399,7 @@ cmd_check() {
   fi
   # the marker README: the text this tuteur writes, from the repository's own app (which knows how it runs
   # tuteur), once every pattern is filled (an empty one's guide can't be told). graft's README is an alias
-  # through 0.1.x: aliases_in_use names it, and sync rewrites it
+  # through 0.2.x: aliases_in_use names it, and sync rewrites it
   if [ -z "$committed" ] && [ -n "${TUTEUR_IN_REPO:-}" ] && [ -n "$PATTERNS" ] \
      && ! grep -qsF -- "$OLD_MARKER" "$PATTERNS/README.md" \
      && rt=$(bash "$here/patterns-readme.sh" text "$PATTERNS" "$TUTEUR_RUN" 2>/dev/null); then
@@ -423,7 +423,7 @@ cmd_check() {
   return "$rc"
 }
 
-# aliases_in_use: one line each (alias_line, never a failure) for the names of graft's that tuteur 0.1.x still reads
+# aliases_in_use: one line each (alias_line, never a failure) for the names of graft's that tuteur 0.2.x still reads
 # and this repository uses: the app graft, the patterns README's old marker, graft's marked workflows, and what
 # mkFlake reports (the folder found by graft's default name, a provider's graft.nix, the arguments scion and
 # scions). The input name graft is read through 0.x, so it gets no line.
