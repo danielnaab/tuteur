@@ -17,9 +17,9 @@ shows how they map to git and Nix. For why tuteur works this way, see [Decisions
   major, as Cargo reads semver). Other tags, such as `v1.3.0-rc.1`, are not versions.
 - **Changelog:** the provider's `CHANGELOG.md`, with one section per version. A breaking version's section has
   **Upgrading** steps that a person or agent can follow with knowledge of the consumer only.
-- **`tuteur.nix`:** an optional file at the top of the provider's repository. It tells a consumer's flake
+- **`pattern.nix`:** an optional file at the top of the provider's repository. It tells a consumer's flake
   which tools, apps, checks and packages the provider contributes, and which other providers it needs
-  ([Write a provider's tuteur.nix](guides/write-tuteur-nix.md)). A provider without one (rules and docs only)
+  ([Write a provider's pattern.nix](guides/write-tuteur-nix.md)). A provider without one (rules and docs only)
   is still a provider.
 
 ## What a consumer holds
@@ -64,7 +64,7 @@ shows how they map to git and Nix. For why tuteur works this way, see [Decisions
 ## Kits, for pot
 
 [pot](https://github.com/danielnaab/pot) runs agents and commands in a sandbox; it is its own repository, and
-tuteur depends on nothing of it. A provider's `tuteur.nix` may return a `kit` for pot (and a consumer's
+tuteur depends on nothing of it. A provider's `pattern.nix` may return a `kit` for pot (and a consumer's
 `perSystem` its own); tuteur hands each to pot unread, through pot's library, when the consumer's flake takes pot
 as an input of its own (`inputs.pot`). The result is `packages.<system>.pot-kits`, which pot reads at a run's
 start. Without `inputs.pot`, there is none ([Declare kit commands](guides/kit-commands.md)).
@@ -78,13 +78,14 @@ tuteur was graft until v2.22.0. The nouns that changed:
 | graft (the product and command) | tuteur |
 | scion (a pattern, pinned in a consumer) | pattern |
 | `scions/`, `.scions/` (the scions directory) | `.patterns/` (the patterns folder) |
-| `graft.nix` (provider/2) | `tuteur.nix` (provider/3) |
+| `graft.nix` (provider/2) | `pattern.nix` (provider/3) |
 | `scion`, `scions` (a provider's arguments) | `pattern`, `patterns` |
 | a new major version | a breaking version (a new major, or a new `0.y`) |
 | `graft-check.yaml`, `graft-upgrade.yaml`, `graft-signers.yaml` | `tuteur-check.yaml`, `tuteur-upgrade.yaml`, `tuteur-signers.yaml` |
 
 tuteur 0.2.x still reads graft's names; `tuteur check` says which this repository uses, and 0.3.0 drops them
-([Move from graft v2](guides/move-from-graft.md)).
+([Move from graft v2](guides/move-from-graft.md)). `tuteur.nix`, the provider file's name before 0.2.1, is read
+through 0.x.
 
 ## The git and Nix binding
 
@@ -95,10 +96,10 @@ tuteur 0.2.x still reads graft's names; `tuteur check` says which this repositor
 | Version | A semver git tag on the provider. tuteur reads tags with `git ls-remote --tags URL`. |
 | Patterns in a build | A git flake with `inputs.self.submodules = true;` has each submodule in its source (`${inputs.self}/.patterns/NAME`). Nix fetches **every** submodule in the repository then, not only patterns, so each must be readable. A `path:` flake copies the working tree, submodules included. |
 | A pattern in the Nix store | mkFlake copies each pattern alone (`pattern-NAME`), so a tool's store path does not change when an unrelated file of the consumer changes. |
-| Provider outputs | Each pattern's `tuteur.nix`, called once per system. Its `tools` become `packages.<system>.tools`, one environment; its checks become `checks.<system>.<pattern>-<name>`. |
+| Provider outputs | Each pattern's `pattern.nix`, called once per system. Its `tools` become `packages.<system>.tools`, one environment; its checks become `checks.<system>.<pattern>-<name>`. |
 | Patterns folder | `<dir>/`, where `dir` is a `mkFlake` argument, default `.patterns`, beside `flake.nix`. |
 | tuteur's pin | The flake input named `tuteur` (else `graft`). |
-| Kit | A provider's `tuteur.nix` and `perSystem` can return `kit`. With `inputs.pot`, mkFlake passes them to `inputs.pot.lib.pot.kitsFor`, which writes the workspace's kits and tools as `packages.<system>.pot-kits`; `pot` builds it with `path:`. Each declared command becomes a wrapper in `tools`, which runs it in pot under its own policy, and the kits' `recipes` become `<dir>/kits.just`. |
+| Kit | A provider's `pattern.nix` and `perSystem` can return `kit`. With `inputs.pot`, mkFlake passes them to `inputs.pot.lib.pot.kitsFor`, which writes the workspace's kits and tools as `packages.<system>.pot-kits`; `pot` builds it with `path:`. Each declared command becomes a wrapper in `tools`, which runs it in pot under its own policy, and the kits' `recipes` become `<dir>/kits.just`. |
 
 Nix and git see a pattern differently, and one difference matters every day: a git flake's build reads a pattern
 at its **committed** gitlink while the rest of your tree is clean, and from your working tree once any tracked

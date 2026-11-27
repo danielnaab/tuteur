@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.2.1 - 2026-11-27
+
+A patch: the weekly upgrade takes it by itself.
+
+- **A provider's file is `pattern.nix`.** mkFlake and `check` read `pattern.nix` first, then `tuteur.nix` (its name
+  in 0.1.0 and 0.2.0, read through 0.x), then graft's `graft.nix` (through 0.2.x). The contract is still
+  [provider/3](docs/reference/provider.md); only the file's name changes, to say what it is rather than which tool
+  reads it. pot protects all three names in a run. A provider that ships only `pattern.nix` needs its consumers on
+  tuteur 0.2.1 or later: release it as a breaking version, or ship `tuteur.nix` beside it meanwhile
+  ([Write a provider's pattern.nix](docs/guides/write-tuteur-nix.md)).
+- The guides, references and their fixtures name `pattern.nix`, and pin tuteur v0.2.1.
+
 ## v0.2.0 - 2026-11-27
 
 A breaking version: `check` now fails on an edited or stale `.patterns/README.md`, so the weekly upgrade holds this

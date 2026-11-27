@@ -41,7 +41,7 @@ those are git flakes, which copy the whole repository.
    ```nix
    {
      description = "This repository's agent tools";
-     inputs.tuteur.url = "github:danielnaab/tuteur/v0.2.0";
+     inputs.tuteur.url = "github:danielnaab/tuteur/v0.2.1";
      outputs = inputs: inputs.tuteur.lib.mkFlake { inherit inputs; dir = ".patterns"; };
    }
    ```
@@ -74,7 +74,7 @@ those are git flakes, which copy the whole repository.
 4. Put tuteur's workflows at the top, where Forgejo reads them:
 
    ```
-   (cd nix/agent-tools && nix flake init -t github:danielnaab/tuteur/v0.2.0)
+   (cd nix/agent-tools && nix flake init -t github:danielnaab/tuteur/v0.2.1)
    mkdir -p .forgejo/workflows && mv -n nix/agent-tools/.forgejo/workflows/*.yaml .forgejo/workflows/ && rm -r nix/agent-tools/.forgejo
    ```
 
@@ -130,7 +130,7 @@ nix run 'path:nix/agent-tools#tuteur' check && test ! -e flake.nix && test -z "$
 | Build the tools | `nix build 'path:nix/agent-tools#tools'` |
 | Upgrade | `nix run 'path:nix/agent-tools#tuteur' upgrade` |
 | Lock again after an edit to `flake.nix` | `nix flake lock "path:$PWD/nix/agent-tools"` |
-| Run a command from tuteur's own flake | `nix run github:danielnaab/tuteur/v0.2.0 -- outdated -C .` |
+| Run a command from tuteur's own flake | `nix run github:danielnaab/tuteur/v0.2.1 -- outdated -C .` |
 
 - **Always write `path:`.** `.` inside the subdirectory, `./nix/agent-tools` and `git+file:` references are
   git flakes, which copy the whole repository.

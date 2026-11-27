@@ -24,7 +24,7 @@ a real consumer. A consumer takes it on a branch, follows the steps, and merges 
 ## Part 1: the provider releases the change
 
 Anything that a consumer can rely on is your interface: a path in your repository, a heading that a consumer
-links to, a field that your checker requires, a tool's name or flags in your `tuteur.nix`, a settings file's
+links to, a field that your checker requires, a tool's name or flags in your `pattern.nix`, a settings file's
 shape. A change to it is incompatible, and needs a new major
 version. For `0.y.z`, a new `0.y` counts as one.
 

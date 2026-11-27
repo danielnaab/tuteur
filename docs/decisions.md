@@ -28,7 +28,7 @@ tuteur 0.1.0.
 
 A pattern is a git submodule at a provider's release tag. The gitlink is the pin, and `.gitmodules` names the
 source. Nix reads patterns through `inputs.self.submodules = true` (or from the working tree, for a `path:`
-flake). Each provider's `tuteur.nix` contributes its tools, apps and checks, so a consumer's `flake.nix` names
+flake). Each provider's `pattern.nix` contributes its tools, apps and checks, so a consumer's `flake.nix` names
 no provider.
 
 Why: in the twelve days of v2 copy mode, the measured cost was Nix's export hashing, not the copy. Lock
@@ -87,7 +87,7 @@ pot's ([pot](https://github.com/danielnaab/pot)).
 ## Declarations live in the files they describe
 
 tuteur reads what is already in the repository instead of a list in a separate file: `.gitmodules` for the
-patterns and their URLs, the marker README for the patterns folder and the flake, each provider's `tuteur.nix`
+patterns and their URLs, the marker README for the patterns folder and the flake, each provider's `pattern.nix`
 for its outputs, and marker lines in workflows (`# managed by tuteur`, `# tuteur ssh:`). A declaration in the
 file cannot drift from it.
 
@@ -97,7 +97,7 @@ A consumer's agents read what its `AGENTS.md` points at, and each consumer used 
 every pattern's docs, which an upgrade could leave dangling. A provider writes its guide for consumers once, in
 `USING.md` (its `AGENTS.md` stays about work on the provider), and the marker README, which tuteur already writes,
 links each pattern's guide at its recorded commit. A consumer's `AGENTS.md` links that README once. A file at a
-fixed name, not a `tuteur.nix` attribute: tuteur's commands read it without evaluating Nix, and a provider
+fixed name, not a `pattern.nix` attribute: tuteur's commands read it without evaluating Nix, and a provider
 without Nix wiring has one too ([Declarations live in the files they describe](#declarations-live-in-the-files-they-describe)).
 Links, not imports: `@` imports are one agent tool's, and would load every guide into every session. tuteur
 links the guides and never copies their text, as it hands text to agents and never runs one.
@@ -133,7 +133,7 @@ graft v1 is on the read-only `v1` branch of graft's repository (2025-12 to 2026-
 | v1 | Now |
 |---|---|
 | `changes:`, migration commands, atomic upgrade with rollback | The upgrade pull request is the transaction: a branch, checked by the whole `nix flake check`, merged or closed. A breaking version declares a break, the CHANGELOG says what to do, and `tuteur migrate` writes a brief. |
-| `commands:`, `graft run dep:command` | A provider's `tuteur.nix`: its tools go on the consumer's `PATH` through `packages.<system>.tools`, its apps and checks into the consumer's flake. A tool that is not tied to a pattern can be an ordinary flake input, as tuteur is. |
+| `commands:`, `graft run dep:command` | A provider's `pattern.nix`: its tools go on the consumer's `PATH` through `packages.<system>.tools`, its apps and checks into the consumer's flake. A tool that is not tied to a pattern can be an ordinary flake input, as tuteur is. |
 | State queries, run logs | The repository's own checks and CI. |
 | Grove (a terminal UI for many repositories) | Out of scope. `nix run github:danielnaab/tuteur/v0.1.0 -- outdated -C <repo>` reads any checkout, and `tuteur status --json` ([status/1](../contracts/status-1.md)) is what a program like grove reads. |
 | Scions as agent sessions | Agent tools outside tuteur. A pattern is another repository at a release tag. |

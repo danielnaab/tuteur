@@ -15,9 +15,9 @@ in a consumer.
   `USING.md`: each consumer's patterns README links it ([Files: USING.md](../reference/files.md#usingmd)).
 - The example releases `note-kit` v1.2.0, which fixes its tool, `note-lint`. `team-notes` adds it.
 - Choose the version: a patch version for a fix, a minor version for an addition (a new tool, a first
-  `tuteur.nix`), and a major version for a change that can break a consumer
+  `pattern.nix`), and a major version for a change that can break a consumer
   ([Ship and take a breaking change](incompatible-change.md#part-1-the-provider-releases-the-change)).
-- If your pattern ships tools or checks, also read [Write a provider's tuteur.nix](write-tuteur-nix.md).
+- If your pattern ships tools or checks, also read [Write a provider's pattern.nix](write-tuteur-nix.md).
 
 ## Steps
 
@@ -32,9 +32,9 @@ in a consumer.
 
    tuteur reads sections headed `## vX.Y.Z` or `## X.Y.Z`. Anything can follow the version, such as the date.
 
-2. If you ship a `tuteur.nix`, run `nix flake check` in your repository, with a check that evaluates it as a
+2. If you ship a `pattern.nix`, run `nix flake check` in your repository, with a check that evaluates it as a
    consumer would ([Check the contract before you tag](write-tuteur-nix.md#check-the-contract-before-you-tag)).
-   An error in `tuteur.nix` fails every consumer's checks at their next upgrade; a parse error breaks their
+   An error in `pattern.nix` fails every consumer's checks at their next upgrade; a parse error breaks their
    whole flake.
 
 3. Commit the release on your default branch:

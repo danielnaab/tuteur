@@ -9,7 +9,7 @@ workflows or give them more secrets.
 ## The risk
 
 A weekly upgrade moves patterns, and can move tuteur's own pin. The new versions are code that nobody has
-reviewed yet, and the upgrade runs it: each provider's `tuteur.nix`, tools and checks, the new tuteur version's
+reviewed yet, and the upgrade runs it: each provider's `pattern.nix`, tools and checks, the new tuteur version's
 commands, and the repository's own checks over them. The workflows run with `sandbox = false`, so that code is
 not in Nix's sandbox.
 

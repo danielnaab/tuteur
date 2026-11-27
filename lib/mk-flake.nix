@@ -5,7 +5,8 @@
 # the source; flake.lock pins tuteur alone. Nix reads the patterns through `inputs.self.submodules =
 # true` (a git flake: Nix fetches each at its gitlink) or from the working tree (a `path:` flake).
 #
-# A pattern whose repository has a `tuteur.nix` at its top is a provider: tuteur.nix is a function
+# A pattern whose repository has a `pattern.nix` at its top (`tuteur.nix`, 0.2.0's name, is read through 0.x) is a
+# provider: pattern.nix is a function
 #
 #   { pkgs, lib, system, pattern, patterns, consumer, ... }:
 #   { requires ? {}; tools ? {}; apps ? {}; packages ? {}; checks ? {}; kit ? {}; ... }
@@ -29,7 +30,7 @@
 #              `tuteur add url`
 #   kit        each provider's (a pattern kit) and perSystem's (the repo kit), handed unread to pot's
 #              library (pot.lib.kitsFor, contract pot-lib/1) with each one's file, the tools and tuteur's
-#              CLI for the repo, and what tuteur has pot protect (every tuteur.nix, the patterns folder):
+#              CLI for the repo, and what tuteur has pot protect (every provider file, the patterns folder):
 #              packages.<system>.pot-kits, which pot builds with path: and reads (contract pot-kits/1).
 #              (v2.15.0's graft-kits went in v2.17.0; its name stays reserved.) graft v2.14.0's `sandbox`
 #              is an error naming `kit`.
@@ -127,8 +128,10 @@ let
   ok = x: if problems == [ ] then x else throw (lib.concatStringsSep "\n" problems);
   emptyMsg = ns: why: "tuteur: ${paths ns} ${if lib.length ns == 1 then "is" else "are"} empty in the flake's source${why}: run git submodule update --init --recursive (or tuteur sync)${lib.optionalString hasGitmodules github}";
 
-  # a provider's file: tuteur.nix, else graft.nix (graft v2's name, read through 0.2.x: tuteur check names it)
-  providerFile = n: if builtins.pathExists "${root}/${n}/tuteur.nix" then "tuteur.nix"
+  # a provider's file: pattern.nix, else tuteur.nix (0.2.0's name, read through 0.x), else graft.nix (graft v2's
+  # name, read through 0.2.x: tuteur check names it)
+  providerFile = n: if builtins.pathExists "${root}/${n}/pattern.nix" then "pattern.nix"
+    else if builtins.pathExists "${root}/${n}/tuteur.nix" then "tuteur.nix"
     else if builtins.pathExists "${root}/${n}/graft.nix" then "graft.nix" else null;
   providers = lib.filter (n: !(isEmpty n) && providerFile n != null) names;
   fileOf = n: "${folder}/${n}/${providerFile n}";
@@ -214,7 +217,7 @@ let
       tuteurAliases = lib.optional (oldDir != null) {
           thing = "the folder ${folder}/, which mkFlake finds without dir,";
           todo = "keep it with dir = \"${folder}\"; in mkFlake, or move it to .patterns/ (0.3.0's Upgrading steps)"; }
-        ++ map (n: { thing = fileOf n; todo = "the provider ships tuteur.nix (ask its maintainers; it can ship both meanwhile)"; })
+        ++ map (n: { thing = fileOf n; todo = "the provider ships pattern.nix (ask its maintainers; it can ship both meanwhile)"; })
           (lib.filter (n: providerFile n == "graft.nix") providers)
         ++ lib.concatMap (n: let f = if n == "self" then perSystem else import "${copies.${n}}/${providerFile n}"; a = argNames f; in
           lib.optional (a != [ ]) {
@@ -247,8 +250,8 @@ let
         self = kitUnits.self or null;
         scions = removeAttrs kitUnits [ "self" ];
         tools = lib.attrValues tools ++ [ tuteurForRepo ];
-        # tuteur's own files: every provider's tuteur.nix and the patterns folder are read-only in a run
-        files = [ "**/tuteur.nix" "**/graft.nix" folder ];
+        # tuteur's own files: every provider file (pattern.nix, or an older name) and the patterns folder are read-only in a run
+        files = [ "**/pattern.nix" "**/tuteur.nix" "**/graft.nix" folder ];
         # tuteur's own recipes, in the same kits.just as the kits' (v2.18.0)
         recipes = {
           outdated = { run = "tuteur outdated"; description = "Show the pinned and newest tag of each pattern"; };

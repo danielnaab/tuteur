@@ -28,12 +28,12 @@ input keeps its name, `graft`, so nothing else in your flake changes.
 1. On a new branch, change the input's URL in `flake.nix`, and, under pot, add pot:
 
    ```nix
-   inputs.graft.url = "github:danielnaab/tuteur/v0.2.0";
+   inputs.graft.url = "github:danielnaab/tuteur/v0.2.1";
    inputs.pot.url = "github:danielnaab/pot/v0.3.0";     # only where agents or kit commands run under pot
    ```
 
    A `git+https://…/graft?ref=refs/tags/vX&exportIgnore=1` URL becomes
-   `git+https://…/tuteur?ref=refs/tags/v0.2.0&exportIgnore=1` the same way. Keep the name `graft`. Then lock,
+   `git+https://…/tuteur?ref=refs/tags/v0.2.1&exportIgnore=1` the same way. Keep the name `graft`. Then lock,
    through an empty fetch cache:
 
    ```
@@ -93,7 +93,7 @@ nix run .#tuteur outdated
 nix run .#tuteur check
 ```
 
-`outdated` lists `graft` at `v0.2.0` (the input's name, tuteur's version). `check` passes. The next weekly
+`outdated` lists `graft` at `v0.2.1` (the input's name, tuteur's version). `check` passes. The next weekly
 `tuteur-upgrade` run takes tuteur's and pot's 0.1.x patches by itself, and holds 0.2.0 for a person.
 
 ## If something goes wrong

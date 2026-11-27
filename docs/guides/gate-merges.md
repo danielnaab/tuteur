@@ -10,7 +10,7 @@ require it before a merge.
 
 - The repository adds the pattern, and `nix flake check` passes ([Add your first pattern](add-a-pattern.md)).
   The example adds `page-rules`, a provider with one rule (each page in `docs/` gives its status in front
-  matter) and a checker. Its `tuteur.nix` contributes a check, `pages`, that runs the checker on your `docs/`.
+  matter) and a checker. Its `pattern.nix` contributes a check, `pages`, that runs the checker on your `docs/`.
 - CI must be able to fetch the provider. For a private provider, see
   [Add a private provider](private-providers.md).
 - `flake.nix` is at the repository's top. A flake in a subdirectory sees only that directory, so a provider's
@@ -198,7 +198,7 @@ curl -fsS -H "Authorization: token $FORGEJO_TOKEN" "https://forgejo.example/api/
 
 ## How it works
 
-- **Where the check comes from.** The provider's `tuteur.nix` returns `checks.pages`, a Nix build that reads
+- **Where the check comes from.** The provider's `pattern.nix` returns `checks.pages`, a Nix build that reads
   your repository through `consumer`. mkFlake adds it as `checks.<system>.page-rules-pages`. It uses the tools the
   provider names, at the versions that the pattern's commit pins, so CI uses the same checker as you. It is part
   of `nix flake check`, which tuteur's weekly upgrade also runs, so a new version of the pattern is tested on
@@ -240,7 +240,7 @@ Keep `tuteur-check.yaml` beside it: it runs tuteur's check.
 
 ## Sources
 
-- [lib/mk-flake.nix](../../lib/mk-flake.nix): prefixed checks from each `tuteur.nix`, `consumer`, `perSystem`, and the merge of a
+- [lib/mk-flake.nix](../../lib/mk-flake.nix): prefixed checks from each `pattern.nix`, `consumer`, `perSystem`, and the merge of a
   repository's own `outputs` (`lib.recursiveUpdate`).
 - [lib/ci.sh](../../lib/ci.sh): `check`, which evaluates `tools` but builds no check; `upgrade`, which runs the
   whole `nix flake check` and pushes; `pr`, which titles a failing upgrade.

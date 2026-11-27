@@ -21,8 +21,8 @@ The files tuteur reads and writes, and the lines in them that tuteur recognizes.
 | Settings files, such as `knowledge-base.yaml` | Read by providers' tools and checks, never by tuteur. | What a provider lets you configure. Each provider's README names its file. |
 
 Inside a [pot run](https://github.com/danielnaab/pot/blob/v0.1.0/docs/reference/pot.md#protected-paths), the flake directory, `.gitmodules`, `.envrc`, `justfile` and
-`.pre-commit-config.yaml` (at any depth), and the git metadata, are read-only. So are each `tuteur.nix`, each
-`graft.nix` and the patterns folder, which mkFlake names in the bundle's `protect`
+`.pre-commit-config.yaml` (at any depth), and the git metadata, are read-only. So are each provider file
+(`pattern.nix`, `tuteur.nix`, `graft.nix`) and the patterns folder, which mkFlake names in the bundle's `protect`
 ([pot-lib/1](https://github.com/danielnaab/pot/blob/v0.1.0/contracts/pot-lib-1.md)), when the flake has `inputs.pot`.
 
 ## The marker README
@@ -154,7 +154,7 @@ living-specifications, then meta-knowledge-base. Keep providers to one level
 |---|---|
 | Tags | Semver tags (`v1.2.3` or `1.2.3`) are versions. Other tags, such as `v1.3.0-rc.1`, are ignored. A tag may be lightweight, annotated or signed. Never move a released tag: consumers' gitlinks point at its commit. |
 | `CHANGELOG.md` | One `## vX.Y.Z` (or `## X.Y.Z`) section per release; anything can follow the version, such as the date. A major version's section has an `### Upgrading` subsection (tuteur also takes `### Migration`). tuteur reads it from the provider's repository at the target tag. |
-| `tuteur.nix` | Optional. What the provider contributes to a consumer's flake ([below](#tuteurnix)). |
+| `pattern.nix` | Optional. What the provider contributes to a consumer's flake ([below](#patternnix)). |
 | `USING.md` | Optional. The guide for the repositories that use the provider, which each consumer's marker README links ([below](#usingmd)). |
 | `README.md` | What the provider is. A consumer's marker README links it when there is no `USING.md`. |
 | `.gitattributes` | No longer read by tuteur. A consumer gets the whole repository. `export-ignore` lines still apply to `git archive`, if you use it. |
@@ -178,7 +178,7 @@ their own repository:
 A provider's `AGENTS.md` stays about work on the provider. tuteur reads only whether the file exists at the
 pattern's recorded commit.
 
-### tuteur.nix
+### pattern.nix
 
 A function, called once per system by the consumer's mkFlake. Its versioned contract is
 [provider/3](provider.md).
@@ -196,14 +196,15 @@ A function, called once per system by the consumer's mkFlake. Its versioned cont
 ```
 
 **Arguments.** Always passed, except `kitArgs`. Take `...`, so that a later tuteur version can add one. Through
-0.2.x, graft's `scion` and `scions` are passed beside `pattern` and `patterns` ([provider/3](provider.md)), and a
-pattern with no `tuteur.nix` has its `graft.nix` read.
+0.2.x, graft's `scion` and `scions` are passed beside `pattern` and `patterns` ([provider/3](provider.md)). A
+pattern with no `pattern.nix` has its `tuteur.nix` read (the name before 0.2.1, through 0.x), else its `graft.nix`
+(through 0.2.x).
 
 | Argument | Value |
 |---|---|
 | `pkgs`, `lib`, `system` | The consumer's `inputs.nixpkgs` if it has one, else tuteur's pinned nixpkgs. |
 | `pattern` | This pattern, copied alone into the store, without its `.git` file. Relative paths (`./bin/tool`) resolve in it too. |
-| `patterns` | Every pattern of the consumer. `patterns.NAME` is the pattern's store path (`"${patterns.NAME}/src"` works) merged with its `tuteur.nix` result (`patterns.NAME.tools.TOOL`). |
+| `patterns` | Every pattern of the consumer. `patterns.NAME` is the pattern's store path (`"${patterns.NAME}/src"` works) merged with its `pattern.nix` result (`patterns.NAME.tools.TOOL`). |
 | `consumer` | The consumer flake's source: the repository for a top-level flake, only the flake's directory for a `path:` flake. Checks read the consumer's settings from it, such as `${consumer}/knowledge-base.yaml`, and skip, not fail, when the file is absent. |
 | `kitArgs` | The consumer's `perSystem.kitArgs.<pattern>` for this pattern, or `{ }`. A kit computes its requests from it, never from a file in the workspace. Passed only when the function names `kitArgs`. |
 
@@ -224,11 +225,11 @@ pattern with no `tuteur.nix` has its `graft.nix` read.
   sibling (one that first ships a tool it uses) releases a new major version of its own, and says so in its
   Upgrading steps. A consumer that renames a folder breaks `requires`, by design.
 - Providers ship no dev shells. A consumer's `devShells.default` has every tool on `PATH`.
-- Never read the provider's own patterns from `tuteur.nix`: a git flake consumer has them, a `path:` flake
+- Never read the provider's own patterns from `pattern.nix`: a git flake consumer has them, a `path:` flake
   consumer has them empty.
 - A provider's own `flake.nix` and `flake.lock` are for work on the provider. Consumers never evaluate them.
-  To pin something other than the consumer's nixpkgs, fetch it in `tuteur.nix` with a fixed hash
-  ([Write a provider's tuteur.nix](../guides/write-tuteur-nix.md#pin-your-own-inputs)).
+  To pin something other than the consumer's nixpkgs, fetch it in `pattern.nix` with a fixed hash
+  ([Write a provider's pattern.nix](../guides/write-tuteur-nix.md#pin-your-own-inputs)).
 
 ### Naming
 
@@ -366,8 +367,8 @@ image with no ssh client, it takes `openssh` from Nix.
 ## Sources
 
 - [lib/common.sh](../../lib/common.sh): finding the marker README; semver tags
-- [lib/mk-flake.nix](../../lib/mk-flake.nix): the `tuteur.nix` arguments, merging and collisions, `kit`
-- [provider/3](provider.md): the `tuteur.nix` contract
+- [lib/mk-flake.nix](../../lib/mk-flake.nix): the `pattern.nix` arguments, merging and collisions, `kit`
+- [provider/3](provider.md): the `pattern.nix` contract
 - [lib/workflows.sh](../../lib/workflows.sh): workflow ownership, the branches, paths-ignore and ssh lines
 - [lib/tools.sh](../../lib/tools.sh): `add`, `upgrade` and `.gitmodules`
 - [lib/common.sh](../../lib/common.sh) `upstream_range`, `changelog_between`: `CHANGELOG.md` read from the

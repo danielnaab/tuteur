@@ -61,10 +61,11 @@ try_state() {
   elif [ -e "$TRY" ]; then echo left; fi
 }
 
-# provider_file PATH: the provider file of the pattern at PATH: PATH/tuteur.nix, else PATH/graft.nix (graft v2's name,
+# provider_file PATH: the provider file of the pattern at PATH: PATH/pattern.nix, else PATH/tuteur.nix (0.2.0's name,
+# read through 0.x), else PATH/graft.nix (graft v2's name,
 # read through 0.2.x); fails when it has neither
 provider_file() {
-  if [ -f "$1/tuteur.nix" ]; then echo "$1/tuteur.nix"; elif [ -f "$1/graft.nix" ]; then echo "$1/graft.nix"; else return 1; fi
+  if [ -f "$1/pattern.nix" ]; then echo "$1/pattern.nix"; elif [ -f "$1/tuteur.nix" ]; then echo "$1/tuteur.nix"; elif [ -f "$1/graft.nix" ]; then echo "$1/graft.nix"; else return 1; fi
 }
 
 # The copy-mode README graft v2.12 and earlier wrote: a table of copied patterns

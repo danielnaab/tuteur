@@ -15,7 +15,7 @@ unchanged (`tests/run.sh own` proves it).
 | Path | Contents |
 |---|---|
 | `flake.nix` | `lib.mkFlake`, the `tuteur` package (`packages.default`), tuteur's own app (`apps.tuteur`), the template, and the checks; and pot's old names (`lib.mkRoot`, `lib.pot`, `kits`, `apis`, `homeManagerModules.pot`), each an error that names pot's flake. It does not call `mkFlake` on itself and does not declare `inputs.self.submodules` ([below](#test)). |
-| `lib/mk-flake.nix` | `mkFlake`: discovery of patterns, `tuteur.nix` (or `graft.nix`) calls, the merge of outputs, the evaluation errors, and the call to `inputs.pot.lib.pot.kitsFor` when the consumer has pot. It reads no kit field. |
+| `lib/mk-flake.nix` | `mkFlake`: discovery of patterns, `pattern.nix` (or `tuteur.nix` or `graft.nix`) calls, the merge of outputs, the evaluation errors, and the call to `inputs.pot.lib.pot.kitsFor` when the consumer has pot. It reads no kit field. |
 | `lib/tuteur.sh` | The command: dispatches to the scripts below. |
 | `lib/patterns.sh` | `add`, `sync`, `check`, `status`, `try`. |
 | `lib/tools.sh` | `outdated`, `changelog`, `upgrade`. |

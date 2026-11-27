@@ -8,16 +8,16 @@ Every `mkFlake` argument, flake output, command and flag.
 ## mkFlake
 
 `tuteur.lib.mkFlake { inputs; dir ? ".patterns"; perSystem ? null; outputs ? { }; }` returns the repository's
-flake outputs. It calls each provider's `tuteur.nix` (else `graft.nix`) under the contract [provider/3](provider.md).
+flake outputs. It calls each provider's `pattern.nix` (else `tuteur.nix`, else `graft.nix`) under the contract [provider/3](provider.md).
 When the flake has `inputs.pot`, it hands the kits to pot's library under
 [pot-lib/1](https://github.com/danielnaab/pot/blob/v0.1.0/contracts/pot-lib-1.md), which writes them as
 [pot-kits/1](https://github.com/danielnaab/pot/blob/v0.1.0/contracts/pot-kits-1.md).
 
 | Argument | Default | Meaning |
 |---|---|---|
-| `inputs` | (required) | The flake's inputs. `inputs.self` is the repository. If there is an `inputs.nixpkgs`, it is the `pkgs` that every `tuteur.nix` gets; otherwise tuteur's own pinned nixpkgs. If there is an `inputs.pot`, mkFlake calls its `lib.pot.kitsFor` for `pot-kits`; otherwise there is no `pot-kits`. |
+| `inputs` | (required) | The flake's inputs. `inputs.self` is the repository. If there is an `inputs.nixpkgs`, it is the `pkgs` that every `pattern.nix` gets; otherwise tuteur's own pinned nixpkgs. If there is an `inputs.pot`, mkFlake calls its `lib.pot.kitsFor` for `pot-kits`; otherwise there is no `pot-kits`. |
 | `dir` | `".patterns"` | The patterns folder: one folder name (`[A-Za-z0-9._-]+`, not `.`, `..` or `.git`), in the flake's directory. Through 0.2.x, with no `dir` and no `.patterns/`, graft's default is read: `scions/`, else `.scions/`, when it holds the marker README (`tuteur check` names it). |
-| `perSystem` | none | The repository's own tools, apps, packages, checks, dev shells and repo kit: a function `{ pkgs, lib, system, patterns, ... }: { tools ? { }; apps; packages; checks; devShells; kit; kitArgs; }`, called once per system and merged like a provider's `tuteur.nix`, under the name `self` (a collision says `from pattern A and the consumer's perSystem`). Its checks are not prefixed: `checks.<system>.NAME`. Its `devShells` are output as they are. Use it to put a tool of your own, such as `bun`, into `tools`. Its `kit` is the repository's [repo kit](https://github.com/danielnaab/pot/blob/v0.1.0/docs/reference/pot.md#schema), and its `kitArgs.<kit>` are the arguments that a provider's kit reads. |
+| `perSystem` | none | The repository's own tools, apps, packages, checks, dev shells and repo kit: a function `{ pkgs, lib, system, patterns, ... }: { tools ? { }; apps; packages; checks; devShells; kit; kitArgs; }`, called once per system and merged like a provider's `pattern.nix`, under the name `self` (a collision says `from pattern A and the consumer's perSystem`). Its checks are not prefixed: `checks.<system>.NAME`. Its `devShells` are output as they are. Use it to put a tool of your own, such as `bun`, into `tools`. Its `kit` is the repository's [repo kit](https://github.com/danielnaab/pot/blob/v0.1.0/docs/reference/pot.md#schema), and its `kitArgs.<kit>` are the arguments that a provider's kit reads. |
 | `outputs` | `{ }` | Plain extra outputs, merged last with `recursiveUpdate`, so they add to and override tuteur's, except `apps.<system>.tuteur`, `apps.<system>.graft` and the reserved names `sandbox`, `pot`, `pot-kits` and `graft-kits`. |
 
 Removed in graft v2.13.0: `scions` (there is no input list) and `flakeDir` (tuteur finds the flake as the parent of
@@ -32,8 +32,8 @@ need it.
 
 Every directory in `${inputs.self}/<dir>` is a pattern. Where the flake's source has a `.gitmodules` (a flake
 at the repository's top), its submodule paths under `<dir>` must match those directories. Each pattern is copied
-alone into the store, without its `.git` file, as `pattern-<name>`. A pattern with a `tuteur.nix` at its top is
-called once per system ([Files](files.md#tuteurnix)).
+alone into the store, without its `.git` file, as `pattern-<name>`. A pattern with a `pattern.nix` at its top is
+called once per system ([Files](files.md#patternnix)).
 
 ### Outputs
 
@@ -45,21 +45,21 @@ For `x86_64-linux`, `aarch64-linux`, `x86_64-darwin` and `aarch64-darwin`:
 | `packages.<system>.<name>` | Each pattern's `packages`. |
 | `apps.<system>.<name>` | Each pattern's `apps`. |
 | `apps.<system>.tuteur` | The `tuteur` command for this repository. |
-| `packages.<system>.pot-kits` | The workspace's kits for [`pot`](https://github.com/danielnaab/pot/blob/v0.1.0/docs/reference/pot.md), built by pot's library (`inputs.pot.lib.pot.kitsFor`, which mkFlake calls with each kit unread): `kit.json` (`{ version = 1; self; patterns.<name>; protect; }`: the repo kit and each provider's, each with its `file`, and what tuteur has pot protect: `**/tuteur.nix` and the patterns folder), `bin/` (the tools, `tuteur` for this repository, and the repo kit's `tools`; a run gets it as `POT_TOOLS`), and `closure` (their store paths). `pot` builds it with `path:`. |
+| `packages.<system>.pot-kits` | The workspace's kits for [`pot`](https://github.com/danielnaab/pot/blob/v0.1.0/docs/reference/pot.md), built by pot's library (`inputs.pot.lib.pot.kitsFor`, which mkFlake calls with each kit unread): `kit.json` (`{ version = 1; self; patterns.<name>; protect; }`: the repo kit and each provider's, each with its `file`, and what tuteur has pot protect: `**/pattern.nix` and the patterns folder), `bin/` (the tools, `tuteur` for this repository, and the repo kit's `tools`; a run gets it as `POT_TOOLS`), and `closure` (their store paths). `pot` builds it with `path:`. |
 | (reserved) | A provider, `perSystem` or `outputs` cannot define `pot-kits`, `graft-kits`, `sandbox` or `pot`. v2.15.0's `graft-kits` bundle is no longer written (since v2.17.0), and since v2.15.0 there is no `packages.<system>.sandbox`; both names stay reserved. |
 | `checks.<system>.<pattern>-<name>` | Each pattern's `checks`, prefixed with the pattern's folder name. |
 | `devShells.<system>.<name>` | `perSystem`'s `devShells`. If none defines `default`, `devShells.<system>.default` is a shell with `tools` (wrapped) on `PATH`. Providers ship no dev shells. |
 
 Everything that reads patterns is evaluated lazily. `apps.<system>.tuteur` and the repository's own `outputs`
 evaluate when a pattern is empty or broken, so `nix run .#tuteur …` can still repair it. A provider whose
-`tuteur.nix` throws is never dropped: `packages.<system>.tools` and `checks.<system>` fail with its error,
-under `… while evaluating .patterns/NAME/tuteur.nix (tuteur calls it for the pattern NAME)`, and so do
+`pattern.nix` throws is never dropped: `packages.<system>.tools` and `checks.<system>` fail with its error,
+under `… while evaluating .patterns/NAME/pattern.nix (tuteur calls it for the pattern NAME)`, and so do
 `nix flake check` and `tuteur check`. Only the names of `apps` and `packages` skip a failing provider, so that
 `nix run .#tuteur` and your own outputs still evaluate.
 
-One failure Nix cannot contain: a `tuteur.nix` that does not **parse** breaks every output of the flake,
+One failure Nix cannot contain: a `pattern.nix` that does not **parse** breaks every output of the flake,
 `apps.<system>.tuteur` too. Run tuteur from outside to see it and move the pattern back:
-`nix run github:danielnaab/tuteur/v0.2.0 -- check -C .` names it
+`nix run github:danielnaab/tuteur/v0.2.1 -- check -C .` names it
 ([`tuteur check` fails](../guides/check-fails.md)).
 
 ### Evaluation errors
@@ -87,7 +87,7 @@ value, so other outputs still evaluate. The fix for each is in
 - `tuteur: apps tuteur (from NAME): that name is tuteur's; the provider must rename it`, and the same for
   `packages tools` and the reserved names `sandbox`, `pot`, `pot-kits` and `graft-kits`; for `perSystem`, `…; rename the repo's
   own`.
-- `tuteur: .patterns/NAME/tuteur.nix gives \`sandbox\`: graft v2.15.0 replaced it with \`kit\` (pot; see tuteur's CHANGELOG)`,
+- `tuteur: .patterns/NAME/pattern.nix gives \`sandbox\`: graft v2.15.0 replaced it with \`kit\` (pot; see tuteur's CHANGELOG)`,
   and the same with `the consumer's perSystem`.
 - `tuteur: mkFlake's outputs has apps.<system>.tuteur: that name is tuteur's; rename the repo's own`. For the
   reserved names: `tuteur: mkFlake's outputs has packages.<system>.sandbox: that name is reserved (pot); rename the repo's own`.
@@ -114,14 +114,14 @@ graft's workflows use; `check` names it). A flag needs `--` before it, because N
 the repository's top.
 
 Every command except `sync` also runs from tuteur's own flake, against any checkout:
-`nix run github:danielnaab/tuteur/v0.2.0 -- COMMAND -C REPO`. tuteur then reads the repository as data, and
+`nix run github:danielnaab/tuteur/v0.2.1 -- COMMAND -C REPO`. tuteur then reads the repository as data, and
 never evaluates its flake outputs.
 
 `nix run .#tuteur` evaluates the repository's flake first, and for a git flake with
 `inputs.self.submodules = true` Nix fetches **every** submodule of the repository (not only the patterns) at
 its gitlink, from its URL, while the tree is clean. A gitlink at a commit the provider's remote lacks (an
 unpushed fix) then stops `nix run .#tuteur` before tuteur runs (`Cannot find Git revision …`). Use
-`nix run github:danielnaab/tuteur/v0.2.0 -- COMMAND -C .` in that state.
+`nix run github:danielnaab/tuteur/v0.2.1 -- COMMAND -C .` in that state.
 
 In zsh with `extendedglob` set, `#` is a glob character, so a flake reference that holds one fails with
 `zsh: no matches found`. Quote it: `'.#tuteur'`, `'path:DIR#tuteur'`. The docs quote every `path:` form, and
@@ -173,7 +173,7 @@ sandbox in tuteur: [pot](https://github.com/danielnaab/pot) is its own repositor
   `tuteur: note: .patterns/NAME has its own submodules (.patterns/docs) …` when it has
   some (it has filled them), then `tuteur: next: commit`, or, for a flake at the top that lacks it,
   `tuteur: next: commit; a git flake also needs inputs.self.submodules = true;`.
-- When the pattern's `tuteur.nix` (or `graft.nix`) requires a sibling this repository does not have (read from its text,
+- When the pattern's `pattern.nix` (or `tuteur.nix` or `graft.nix`) requires a sibling this repository does not have (read from its text,
   `requires.X = "URL";` or `requires = { X = "URL"; };`), it prints
   `tuteur: note: NAME requires X, which this repository does not have: tuteur add URL`.
 - Errors: `tuteur: .patterns/NAME is still tracked as files (a copied pattern?): git rm -r -q --cached .patterns/NAME, delete the folder, then tuteur add again`
@@ -232,10 +232,10 @@ The marker README's commands name this flake's run command: `nix run .#tuteur` f
 | Every pattern is clean: no modified or staged tracked file (untracked files do not count) | `tuteur: uncommitted edits in .patterns/pa: docs/status.md (Nix builds ignore them while the rest of the tree is clean)`; the end is `(tuteur try is on: Nix builds use them)` while try is on, and `(a path: flake's builds use them)` for a flake in a subdirectory |
 | Every pattern is checked out at its gitlink | `tuteur: .patterns/pa is checked out at e3f04b8 but the repository records 9147b3c: git add .patterns/pa to record it, or git submodule update --recursive -- .patterns/pa to go back` |
 | Every pattern's own submodules are filled | `tuteur: .patterns/nest's own submodules are empty (.patterns/docs): git -C .patterns/nest submodule update --init --recursive (or tuteur sync); Nix fails on them while the repo's tree has a modified file` |
-| Every `tuteur.nix` (or `graft.nix`) parses | `tuteur: .patterns/x/tuteur.nix doesn't evaluate (above): every output of this flake fails until it does, tuteur's own app too; move the pattern back (git submodule update --recursive -- .patterns/x), or from outside: nix run github:danielnaab/tuteur/v0.2.0 -- upgrade -C . x@TAG` |
+| Every `pattern.nix` (or `tuteur.nix` or `graft.nix`) parses | `tuteur: .patterns/x/pattern.nix doesn't evaluate (above): every output of this flake fails until it does, tuteur's own app too; move the pattern back (git submodule update --recursive -- .patterns/x), or from outside: nix run github:danielnaab/tuteur/v0.2.1 -- upgrade -C . x@TAG` |
 | Every gitlink is a version tag's commit | `tuteur: .patterns/pa at ec99ed1 is not a release tag of URL (nearest: v1.0.0-1-gec99ed1): release it, then tuteur upgrade pa@TAG (or tuteur upgrade pa, the newest release of its major)` (`nearest` only for a filled pattern) |
 | … and that tag is upstream | `tuteur: .patterns/pa: tag v1.0.1 exists locally but not at URL: push it (git -C .patterns/pa push origin v1.0.1)` |
-| The tools and checks evaluate (from `nix run .#tuteur` only, after every other rule passed) | `tuteur: the flake's tools or checks don't evaluate (above): a provider's tuteur.nix fails` |
+| The tools and checks evaluate (from `nix run .#tuteur` only, after every other rule passed) | `tuteur: the flake's tools or checks don't evaluate (above): a provider's pattern.nix fails` |
 | `<patterns>/kits.just` matches what the flake generates, when the repository uses it (the file exists, or the top `justfile` names `<patterns>/kits.just`); from `nix run .#tuteur` only, not `--committed` | `tuteur: .patterns/kits.just is stale or edited: tuteur sync`; inside a pot run, `tuteur: .patterns/kits.just is stale or edited: run tuteur sync on the host (the patterns folder is read-only in a run)`; when the flake's bundle fails, `tuteur: .patterns/kits.just: the flake's pot-kits doesn't evaluate (above)`; when the flake has no `pot-kits` (no `inputs.pot`) and the file is there, `tuteur: .patterns/kits.just is here but this flake has no pot-kits (no inputs.pot): add inputs.pot, or remove the file` |
 | `<patterns>/README.md` is the text tuteur writes: its rules and a link to each pattern's guide; from `nix run .#tuteur` only, not `--committed`, once every pattern is filled | `tuteur: .patterns/README.md is stale or edited: tuteur sync`; inside a pot run, `tuteur: .patterns/README.md is stale or edited: run tuteur sync on the host (the patterns folder is read-only in a run)` |
 | No `kits.just` recipe has the name of one of the top `justfile`'s own (when it is used) | `tuteur: .patterns/kits.just's recipe X has the name of the justfile's own X: rename one (a kit's recipe never replaces yours)`; `sync` warns with the same line |
@@ -278,7 +278,7 @@ text ([The marker README](files.md#the-marker-readme)). Each message and its fix
 
 `status [-C REPO] [--json]` joins what `check` and `outdated` read: for each pattern, `check`'s facts and messages,
 and the newest release as `outdated` reports it. It reads each upstream's tags once (`git ls-remote`), and does not
-evaluate Nix, compare tuteur's workflows, or read a provider's `tuteur.nix`: those are `check`'s alone. It is for a
+evaluate Nix, compare tuteur's workflows, or read a provider's `pattern.nix`: those are `check`'s alone. It is for a
 person or a program looking across checkouts; `check` is the gate.
 
 ```
@@ -374,7 +374,7 @@ While the marker exists, `check` (and `check --committed`, so `ci check`) fails 
 and `sync` adds a note. `git stash` in the repository fails while `.tuteur-try` is marked
 (`error: Entry '.tuteur-try' not uptodate. Cannot merge.`), and so do `git pull --autostash` and
 `git rebase --autostash`: run `tuteur try --stop` first. `try` reads no flake output, so
-`nix run github:danielnaab/tuteur/v0.2.0 -- try -C .` works while the repository's flake cannot evaluate, or
+`nix run github:danielnaab/tuteur/v0.2.1 -- try -C .` works while the repository's flake cannot evaluate, or
 Nix cannot fetch a pattern's gitlink (an unpushed commit).
 
 ### outdated

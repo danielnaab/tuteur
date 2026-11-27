@@ -3,7 +3,7 @@ status: working
 ---
 # Declare kit commands
 
-A provider's `tuteur.nix` may return a `kit` for [pot](https://github.com/danielnaab/pot), which runs agents and
+A provider's `pattern.nix` may return a `kit` for [pot](https://github.com/danielnaab/pot), which runs agents and
 commands in a sandbox: the commands it ships, the recipes that run them, a hook command, and what they ask to
 reach. tuteur hands the kit to pot unread; what a kit may say, and how pot runs it, is pot's
 ([pot's guide: Declare kit commands](https://github.com/danielnaab/pot/blob/v0.1.0/docs/guides/kit-commands.md),
@@ -12,17 +12,17 @@ provider's wiring, and the consumer's.
 
 ## Before you begin
 
-- Your provider has a `tuteur.nix` with `tools` ([Write a provider's tuteur.nix](write-tuteur-nix.md)).
+- Your provider has a `pattern.nix` with `tools` ([Write a provider's pattern.nix](write-tuteur-nix.md)).
 - A consumer gets your kit only when its flake takes pot as an input of its own (`inputs.pot`). Without it,
   mkFlake builds no `pot-kits`, the tools are not wrapped, there is no `kits.just`, and the consumer's build
-  prints one warning that names your `tuteur.nix`.
+  prints one warning that names your `pattern.nix`.
 
 ## Steps
 
-1. In the provider, return the kit from `tuteur.nix`, beside the tools it names:
+1. In the provider, return the kit from `pattern.nix`, beside the tools it names:
 
    ```nix
-   # tuteur.nix (notebook-kit's, trimmed)
+   # pattern.nix (notebook-kit's, trimmed)
    { pkgs, lib, ... }:
    let check-kb = pkgs.writeShellApplication { name = "check-kb"; text = "…"; }; in
    {

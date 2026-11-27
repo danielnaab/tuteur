@@ -1,10 +1,10 @@
 ---
 status: working
 ---
-# Write a provider's tuteur.nix
+# Write a provider's pattern.nix
 
 Give every consumer your tools on their `PATH`, your checks in their `nix flake check`, and your apps in
-their flake, with no Nix code of theirs: one `tuteur.nix` at the top of your repository.
+their flake, with no Nix code of theirs: one `pattern.nix` at the top of your repository.
 
 ## When to use this
 
@@ -14,8 +14,8 @@ their flake, with no Nix code of theirs: one `tuteur.nix` at the top of your rep
 - **Something to run once**, such as a setup command: `apps`.
 - **A package that is not a command**, such as a bundle of plugins: `packages`.
 - **Your tool uses another provider's tool or files**: `requires` and `patterns`.
-- A provider of rules and docs only needs no `tuteur.nix`.
-- **Seed files**, which a consumer copies once and then owns, such as a starter configuration: no `tuteur.nix`.
+- A provider of rules and docs only needs no `pattern.nix`.
+- **Seed files**, which a consumer copies once and then owns, such as a starter configuration: no `pattern.nix`.
   Tell consumers to copy them out of the pattern without overwriting a copy they have:
   `cp -n .patterns/note-kit/seed/note-kit.conf .`. After an upgrade, they compare:
   `diff note-kit.conf .patterns/note-kit/seed/note-kit.conf`.
@@ -26,14 +26,14 @@ their flake, with no Nix code of theirs: one `tuteur.nix` at the top of your rep
   check that lints a consumer's `notes/`, configured by `note-kit.yaml` in the consumer.
 - A consumer to try it in, such as `team-notes`, that adds note-kit
   ([Add your first pattern](add-a-pattern.md)).
-- The full contract (every argument and attribute, the collision rules): [Files](../reference/files.md#tuteurnix).
+- The full contract (every argument and attribute, the collision rules): [Files](../reference/files.md#patternnix).
 
 ## Steps
 
-1. At the top of your repository, write `tuteur.nix`:
+1. At the top of your repository, write `pattern.nix`:
 
    ```nix
-   # tuteur.nix: called once per system by the consumer's tuteur mkFlake
+   # pattern.nix: called once per system by the consumer's tuteur mkFlake
    { pkgs, lib, pattern, consumer, ... }:
    let
      note-lint = pkgs.writeShellApplication {
@@ -109,23 +109,24 @@ their flake, with no Nix code of theirs: one `tuteur.nix` at the top of your rep
    ```
 
    For a flake in a subdirectory, `try` prints `'path:DIR#…'` commands and changes nothing: a `path:` flake
-   reads its working tree on every build. If `nix run .#tuteur` fails (your `tuteur.nix` does not parse, say),
-   run `nix run github:danielnaab/tuteur/v0.2.0 -- try -C .` instead.
+   reads its working tree on every build. If `nix run .#tuteur` fails (your `pattern.nix` does not parse, say),
+   run `nix run github:danielnaab/tuteur/v0.2.1 -- try -C .` instead.
 
 5. Check the contract in your own flake ([below](#check-the-contract-before-you-tag)), and run
    `nix flake check` there.
 
-6. Commit `tuteur.nix`, the tool and your README, then release
-   ([Publish a pattern](publish.md)). Adding a `tuteur.nix` is a minor version. Removing a tool, renaming one,
+6. Commit `pattern.nix`, the tool and your README, then release
+   ([Publish a pattern](publish.md)). Adding a `pattern.nix` is a minor version. Removing a tool, renaming one,
    or changing a settings file's shape is a major version.
 
-   A provider that shipped graft's `graft.nix` renames it to `tuteur.nix`, and its arguments `scion` and `scions`
-   to `pattern` and `patterns` ([provider/3](../reference/provider.md)). tuteur 0.2.x still reads `graft.nix`
-   and passes the old names, so a release can ship both files while consumers move from graft.
+   A provider that shipped `tuteur.nix` (the name before tuteur 0.2.1) or graft's `graft.nix` renames it to
+   `pattern.nix`, and graft's arguments `scion` and `scions` to `pattern` and `patterns`
+   ([provider/3](../reference/provider.md)). tuteur 0.2.0 reads only `tuteur.nix` and `graft.nix`, so dropping
+   the old file is a breaking release whose consumers need tuteur 0.2.1 or later; or ship both files meanwhile.
 
 ## Check the contract before you tag
 
-A mistake in `tuteur.nix` reaches every consumer at their next upgrade, and it is loud:
+A mistake in `pattern.nix` reaches every consumer at their next upgrade, and it is loud:
 
 - An evaluation error (a `throw`, a missing attribute, a package that does not exist) fails the consumer's
   `packages.<system>.tools`, its checks and `tuteur check`, naming your provider. The weekly upgrade's pull
@@ -133,22 +134,22 @@ A mistake in `tuteur.nix` reaches every consumer at their next upgrade, and it i
 - A **parse error** (a missing `;` or brace) breaks the consumer's whole flake, its own outputs included: Nix
   cannot contain it. The consumer has to move your pattern back by hand.
 
-So evaluate `tuteur.nix` in your own flake, the way a consumer does, and assert what it gives. Use tuteur's
-`mkFlake` with `perSystem`, and import your `tuteur.nix` with your repository as both `pattern` and `consumer`:
+So evaluate `pattern.nix` in your own flake, the way a consumer does, and assert what it gives. Use tuteur's
+`mkFlake` with `perSystem`, and import your `pattern.nix` with your repository as both `pattern` and `consumer`:
 
 ```nix
 {
   inputs.self.submodules = true;
-  inputs.tuteur.url = "github:danielnaab/tuteur/v0.2.0";
+  inputs.tuteur.url = "github:danielnaab/tuteur/v0.2.1";
   outputs = { self, tuteur, ... }@inputs: tuteur.lib.mkFlake {
     inherit inputs;
     perSystem = { pkgs, lib, system, patterns, ... }:
-      let own = import ./tuteur.nix { inherit pkgs lib system patterns; pattern = self; consumer = self; }; in
+      let own = import ./pattern.nix { inherit pkgs lib system patterns; pattern = self; consumer = self; }; in
       {
         inherit (own) tools;
         checks = own.checks // {
           tuteur-nix =
-            assert lib.assertMsg (lib.attrNames own.tools == [ "note-lint" ]) "tuteur.nix: tools are ${toString (lib.attrNames own.tools)}";
+            assert lib.assertMsg (lib.attrNames own.tools == [ "note-lint" ]) "pattern.nix: tools are ${toString (lib.attrNames own.tools)}";
             pkgs.runCommand "tuteur-nix" { nativeBuildInputs = lib.attrValues own.tools; } ''
               note-lint --help > /dev/null
               touch $out
@@ -159,7 +160,7 @@ So evaluate `tuteur.nix` in your own flake, the way a consumer does, and assert 
 }
 ```
 
-`nix flake check` then parses `tuteur.nix`, builds every tool, runs your checks on your own repository, and
+`nix flake check` then parses `pattern.nix`, builds every tool, runs your checks on your own repository, and
 fails if the contract changed. knowledge-base-kit's `flake.nix` does this with its `tuteur-nix` check. Then
 try the release candidate in one real consumer (step 4) before you tag.
 
@@ -180,20 +181,20 @@ and use it through `patterns`:
 }
 ```
 
-- `patterns.NAME` is the other pattern's store path (`"${patterns.NAME}/src"`) merged with its `tuteur.nix` result
+- `patterns.NAME` is the other pattern's store path (`"${patterns.NAME}/src"`) merged with its `pattern.nix` result
   (`patterns.NAME.tools.kb-lint`).
 - A consumer that does not have it gets
   `tuteur: note-kit needs knowledge-base-kit, which this repository does not have: tuteur add https://github.com/danielnaab/knowledge-base-kit`.
 - `requires` has no version. If you start using something that only a newer release of the other provider
   has, release a new major version of yours, and say in its Upgrading steps which release of the other to
   take.
-- Never read your own repository's patterns from `tuteur.nix`: consumers' Nix sees them only for a git flake, and
+- Never read your own repository's patterns from `pattern.nix`: consumers' Nix sees them only for a git flake, and
   your consumers add what they need themselves ([One level](../decisions.md#one-level)).
 
 ## Pin your own inputs
 
 `pkgs` is the consumer's nixpkgs (or tuteur's). When your tool needs another version of something, pin it in
-`tuteur.nix` with a fixed hash. Pure evaluation allows it, and the pin is part of your commit, so consumers
+`pattern.nix` with a fixed hash. Pure evaluation allows it, and the pin is part of your commit, so consumers
 review it when they take your version:
 
 ```nix
@@ -238,7 +239,7 @@ Use your machine's system for `x86_64-linux`.
 
 ## How it works
 
-- The consumer's mkFlake calls `tuteur.nix` once per system, with `pattern` copied alone into the store, so your
+- The consumer's mkFlake calls `pattern.nix` once per system, with `pattern` copied alone into the store, so your
   tool's store path does not change when the consumer commits something unrelated.
 - `tools` from every provider become one `packages.<system>.tools`, which consumers put on `PATH` with
   `nix shell .#tools`, `nix develop` or direnv. Providers ship no dev shells.
@@ -257,4 +258,4 @@ Use your machine's system for `x86_64-linux`.
 - [tests/run.sh](../../tests/run.sh): the providers `kb` (a tool, a check reading a settings file),
   `nk` (requires kb), `mk` (a colliding tool), `same` (a deduplicated tool) and `lk` (a fetchTarball pin).
 - [tests/fixtures.sh](../../tests/fixtures.sh) `publish`: the repositories this page was read against.
-- [Files](../reference/files.md#tuteurnix).
+- [Files](../reference/files.md#patternnix).

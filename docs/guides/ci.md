@@ -9,7 +9,7 @@ merge it or fix it.
 ## Before you begin
 
 - tuteur's two workflows are in `.forgejo/workflows/`: `tuteur-check.yaml` and `tuteur-upgrade.yaml`.
-  `nix flake init -t github:danielnaab/tuteur/v0.2.0` writes them. If you did not use it, copy tuteur's
+  `nix flake init -t github:danielnaab/tuteur/v0.2.1` writes them. If you did not use it, copy tuteur's
   [template/.forgejo/workflows/](../../template/.forgejo/workflows/) there, and commit them. tuteur keeps
   them current ([Files](../reference/files.md#tuteurs-workflows)).
 - A Forgejo Actions runner has the label `nixos-latest`, mapped to `docker://nixos/nix`. Each job must get a
@@ -145,7 +145,7 @@ merge it or fix it.
    |---|---|
    | a deleted or renamed file | your files can link to it |
    | a changed rule or policy text | your pages, or a check that quotes it, can stop matching |
-   | changed checker code, or a changed `tuteur.nix` | your CI runs it on your files |
+   | changed checker code, or a changed `pattern.nix` | your CI runs it on your files |
 
 8. Merge the pull request, when your forge's required checks pass. Forgejo starts no workflow for a push
    made with the job token, so tuteur-check and your own workflows run on the pull request only when tuteur
@@ -282,7 +282,7 @@ it. A status `unknown` means that tuteur cannot read the provider's repository.
   each checkout:
 
   ```
-  for r in ~/src/team-kb ~/src/handbook; do echo "$r"; nix run github:danielnaab/tuteur/v0.2.0 -- outdated -C "$r"; done
+  for r in ~/src/team-kb ~/src/handbook; do echo "$r"; nix run github:danielnaab/tuteur/v0.2.1 -- outdated -C "$r"; done
   ```
 
 ## Report who signed each commit

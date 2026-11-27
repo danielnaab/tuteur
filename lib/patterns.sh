@@ -357,7 +357,7 @@ cmd_check() {
         # a tuteur.nix that doesn't parse breaks every output of the flake, tuteur's app too
         if pf=$(provider_file "$path") && ! err=$(nix_ eval --impure --expr "builtins.isFunction (import $(pwd -P)/$pf)" 2>&1); then
           echo "$err" | tail -5 >&2
-          bad "$pf doesn't evaluate (above): every output of this flake fails until it does, tuteur's own app too; move the pattern back (git submodule update --recursive -- $path), or from outside: nix run github:danielnaab/tuteur/v0.2.0 -- upgrade -C . $name@TAG"
+          bad "$pf doesn't evaluate (above): every output of this flake fails until it does, tuteur's own app too; move the pattern back (git submodule update --recursive -- $path), or from outside: nix run github:danielnaab/tuteur/v0.2.1 -- upgrade -C . $name@TAG"
         fi
       fi
     done <<<"$registered"
@@ -375,7 +375,7 @@ cmd_check() {
     system=$(nix_ eval --impure --raw --expr builtins.currentSystem)
     if ! err=$( { nix_ eval --raw "$FLAKE_REF#packages.$system.tools.drvPath" >/dev/null && nix_ eval --json "$FLAKE_REF#checks.$system" --apply builtins.attrNames >/dev/null; } 2>&1); then
       grep -v "^warning: Git tree" <<<"$err" | tail -15 >&2
-      bad "the flake's tools or checks don't evaluate (above): a provider's tuteur.nix fails"
+      bad "the flake's tools or checks don't evaluate (above): a provider's pattern.nix fails"
     fi
   fi
   # kits.just (v2.18.0): the bytes the flake's kits generate, where the repository uses it

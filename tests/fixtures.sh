@@ -8,7 +8,7 @@
 # this shell (GIT_CONFIG_COUNT; nothing global changes). Consumers use this checkout's tuteur as a
 # path: input (OUT/tuteur, a copy without the inputs.self.submodules line, which Nix refuses on path:).
 #
-#   first-pattern   page-rules.git (a provider with tuteur.nix: a tool, page-lint, and a check of the
+#   first-pattern   page-rules.git (a provider with pattern.nix: a tool, page-lint, and a check of the
 #                   consumer's docs/), and three starting repositories, no tuteur yet: new/ (git init, no
 #                   commits), existing/ (its own flake with a check, committed), notes/ (pages only)
 #   check-fails     page-rules.git at v1.0.0, v1.1.0; consumer/ adds it and passes `tuteur check`; then a
@@ -20,7 +20,7 @@
 #   fix-a-provider  policy-kit/ (the provider's own clone; origin policy-kit.git) at v1.0.0 with a typo in
 #                   docs/status.md and a test (tests/run.sh); team-kb/ adds it at v1.0.0, committed, with
 #                   tuteur's workflows. The reader fixes the typo inside team-kb/.patterns/policy-kit.
-#   gate-merges     page-rules.git (tuteur.nix: checks.pages, which reads the consumer's docs/); team-kb/
+#   gate-merges     page-rules.git (pattern.nix: checks.pages, which reads the consumer's docs/); team-kb/
 #                   adds it with tuteur's workflows and has one committed page that breaks the rule, and an
 #                   untracked one; existing/ has a check of its own (perSystem) as well
 #   private         provider.git (public) and notes-provider.git (private: a file:// URL stands in for
@@ -39,7 +39,7 @@
 #   upgrade         team-kb/ adds style-guide and page-rules at v1.0.0, committed; then style-guide v1.1.0
 #                   (a reworded page, a new one, a deleted one) and page-rules v2.0.0 (Upgrading steps); an
 #                   untracked docs/retro.md that is not about the upgrade
-#   publish         note-kit/ (a provider to release from: rules, bin/note-lint, tuteur.nix building it, a
+#   publish         note-kit/ (a provider to release from: rules, bin/note-lint, pattern.nix building it, a
 #                   seed file, tests/, a CHANGELOG; v1.0.0 lightweight, v1.1.0 annotated; then an
 #                   uncommitted fix and an untracked draft) with origin note-kit.git; team-notes/ adds
 #                   v1.1.0 and runs note-lint in its own check (perSystem), committed and passing
@@ -136,7 +136,7 @@ bad=0
 while IFS= read -r f; do grep -q '^status:' "$f" || { echo "page-lint: $f: no status:"; bad=1; }; done < <(find "${1:-docs}" -name '*.md')
 exit "$bad"
 EOF
-  cat > "$d/tuteur.nix" <<'EOF'
+  cat > "$d/pattern.nix" <<'EOF'
 # page-rules wires itself into the consumer's flake (tuteur's mkFlake calls this once per system)
 { pkgs, pattern, consumer, ... }:
 let
@@ -353,7 +353,7 @@ publish() {
   printf '# note-lint DIR: every note starts with a # title\nfor f in "${1:-.}"/*.md; do head -1 "$f" | grep -q "^# " || { echo "note-lint: $f: no title"; exit 1; }; done\n' > "$p/bin/note-lint"
   echo "titles = required" > "$p/seed/note-kit.conf"
   printf '#!/bin/sh\nbash bin/note-lint docs\n' > "$p/tests/run.sh" && chmod +x "$p/tests/run.sh"
-  cat > "$p/tuteur.nix" <<'EOF'
+  cat > "$p/pattern.nix" <<'EOF'
 # note-kit wires itself into a consumer's flake: tuteur's mkFlake calls this once per system
 { pkgs, pattern, ... }:
 {
@@ -366,7 +366,7 @@ publish() {
 EOF
   printf '# Changelog\n\n## v1.0.0\n- First release.\n' > "$p/CHANGELOG.md"
   release "$p" v1.0.0
-  printf '\n## v1.1.0\n- tuteur.nix: note-lint on PATH.\n' >> "$p/CHANGELOG.md"
+  printf '\n## v1.1.0\n- pattern.nix: note-lint on PATH.\n' >> "$p/CHANGELOG.md"
   release "$p" v1.1.0 -a
   consumer "$c"
   tuteur_in "$c" "$(url note-kit)@v1.1.0"

@@ -25,7 +25,7 @@ request each graft consumer makes.
   stable or deprecated.
 - **Playbooks for agents.** Plan the change, make the smallest patch, then verify it.
 - **Tools and a check.** `kb-lint` fails a page that has no status, or that cites no sources in a folder that
-  needs them. `check-links` fails a link to a missing page or heading. The kit's `tuteur.nix` puts both on your
+  needs them. `check-links` fails a link to a missing page or heading. The kit's `pattern.nix` puts both on your
   `PATH` and in your `nix flake check`.
 
 ```
@@ -85,14 +85,14 @@ git submodules give you a pinned clone. tuteur adds what makes them a dependency
   whole `nix flake check`.
 - **Migration briefs**: what moved, what the provider says, which of your files name a moved path, which
   checks fail.
-- **Provider wiring.** Each provider's `tuteur.nix` contributes tools, apps and checks; your `flake.nix` names
+- **Provider wiring.** Each provider's `pattern.nix` contributes tools, apps and checks; your `flake.nix` names
   no provider.
 - **Empty folders answered.** Nix fetches patterns itself for a git flake while its tree is clean, a
   post-checkout hook that the guide gives fills them in new clones and worktrees, and `tuteur sync` fills them
   ([Clones, worktrees, sandboxes and CI](docs/guides/clones-and-worktrees.md)).
 - **An agent rule** for working with patterns, ready to paste into `AGENTS.md`, and **each pattern's guide**
   for your agents (its `USING.md`), linked from `.patterns/README.md` as patterns come and go.
-- **Kits for pot.** A provider's `tuteur.nix` may return a `kit` for [pot](https://github.com/danielnaab/pot),
+- **Kits for pot.** A provider's `pattern.nix` may return a `kit` for [pot](https://github.com/danielnaab/pot),
   which runs agents and commands in a sandbox. tuteur hands it to pot unread, when your flake takes pot as an
   input of its own ([Declare kit commands](docs/guides/kit-commands.md)). tuteur depends on nothing of pot's.
 
@@ -109,7 +109,7 @@ Compared with the other ways:
 Nix 2.27 or later, with flakes. In a git repository:
 
 ```
-nix flake init -t github:danielnaab/tuteur/v0.2.0
+nix flake init -t github:danielnaab/tuteur/v0.2.1
 ```
 
 It writes tuteur's CI workflows and this `flake.nix`:
@@ -117,7 +117,7 @@ It writes tuteur's CI workflows and this `flake.nix`:
 ```nix
 {
   inputs.self.submodules = true;
-  inputs.tuteur.url = "github:danielnaab/tuteur/v0.2.0";
+  inputs.tuteur.url = "github:danielnaab/tuteur/v0.2.1";
   # Where agents or kit commands run under pot, take pot too (mkFlake then builds pot-kits):
   #   inputs.pot.url = "github:danielnaab/pot/v0.3.0";
   outputs = inputs: inputs.tuteur.lib.mkFlake { inherit inputs; };
@@ -149,9 +149,9 @@ Any repository with semver tags can be a provider:
 - Tag each release with a semver tag on your default branch, and give it a `CHANGELOG.md` section.
 - Release a breaking change as a new major version (below 1.0, a new `0.y`), with **Upgrading** steps that a person or agent can
   follow without knowing your repository's internals.
-- To give consumers tools and checks, add a `tuteur.nix`.
+- To give consumers tools and checks, add a `pattern.nix`.
 
-See [Publish a pattern](docs/guides/publish.md), [Write a provider's tuteur.nix](docs/guides/write-tuteur-nix.md),
+See [Publish a pattern](docs/guides/publish.md), [Write a provider's pattern.nix](docs/guides/write-tuteur-nix.md),
 and [Ship and take a breaking change](docs/guides/incompatible-change.md).
 
 ## Documentation
@@ -171,11 +171,11 @@ and [Ship and take a breaking change](docs/guides/incompatible-change.md).
 | Consumer: keep private files out of the Nix store | [Keep private files out of the Nix store](docs/guides/flake-in-a-subdirectory.md) |
 | Consumer: add a provider that only an ssh key can read | [Add a private provider](docs/guides/private-providers.md) |
 | Provider: release a version | [Publish a pattern](docs/guides/publish.md) |
-| Provider: ship tools, apps and checks | [Write a provider's tuteur.nix](docs/guides/write-tuteur-nix.md) |
+| Provider: ship tools, apps and checks | [Write a provider's pattern.nix](docs/guides/write-tuteur-nix.md) |
 | Provider: hand pot a kit; consumer: import `kits.just` | [Declare kit commands](docs/guides/kit-commands.md) |
 | Anyone: run an agent or a command in a sandbox | [pot](https://github.com/danielnaab/pot), its own repository |
 | Look up a command, flag, `mkFlake` argument or error | [Commands](docs/reference/commands.md) |
-| Look up a file tuteur reads or writes, or the `tuteur.nix` contract | [Files](docs/reference/files.md) |
+| Look up a file tuteur reads or writes, or the `pattern.nix` contract | [Files](docs/reference/files.md) |
 | Look up a format that tuteur shares with other programs | [provider/3](docs/reference/provider.md), [status/1](contracts/status-1.md), and pot's: [pot's contracts](https://github.com/danielnaab/pot/blob/v0.1.0/contracts/README.md) |
 | Know how Nix sees a pattern | [Nix behaviours](docs/reference/nix-behaviours.md) |
 | Know why tuteur is this small | [Decisions](docs/decisions.md) |

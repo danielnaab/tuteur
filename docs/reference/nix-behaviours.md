@@ -41,7 +41,7 @@ More of the same rule:
 - **`nix run .#tuteur` fetches first.** On a clean tree, `nix run .#tuteur …` (sync, check, upgrade) fetches every
   pattern at its gitlink before tuteur runs. A gitlink the provider's remote lacks (an unpushed fix) fails there
   with `Cannot find Git revision …`; run tuteur from its own flake instead:
-  `nix run github:danielnaab/tuteur/v0.2.0 -- check -C .`.
+  `nix run github:danielnaab/tuteur/v0.2.1 -- check -C .`.
 - **A stale pattern.** After `git pull` without `submodule.recurse`, a pattern can be checked out at an older commit
   than the gitlink (`git submodule status` shows `+`). The clean tree builds the gitlink; the same commit with a
   note edited builds the old checkout. `tuteur check` fails on `+`. **tested**
@@ -115,7 +115,7 @@ them empty. With a dirty tree Nix reads the working tree, and fails on an empty 
 `upgrade` fill a pattern's own submodules recursively, and `check` fails while they are empty. **tested**
 
 A `path:` flake does not fetch nested submodules: they are in its build only if they are filled on disk. A
-provider's `tuteur.nix` must never read its own patterns. See [One level](../decisions.md#one-level).
+provider's `pattern.nix` must never read its own patterns. See [One level](../decisions.md#one-level).
 
 ## `path:` flakes in a subdirectory
 
@@ -154,7 +154,7 @@ own, and `tuteur check` compares each pin at a version tag with its tag's `git a
 Interpolating a sub-path of `inputs.self` (`"${inputs.self}/patterns/kb"`) makes a store path that depends on
 the whole consumer source, so every tool that uses it rebuilds on every consumer commit. mkFlake copies each
 pattern alone with `builtins.path` (filtering its `.git` file). A tool's store path then stays the same across
-consumer commits. In a `tuteur.nix`, use `pattern` and `patterns.NAME` for a pattern's files, never `consumer`. **tested**
+consumer commits. In a `pattern.nix`, use `pattern` and `patterns.NAME` for a pattern's files, never `consumer`. **tested**
 
 ## A flake at the repository's top copies every tracked file
 

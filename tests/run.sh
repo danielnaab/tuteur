@@ -95,9 +95,10 @@ release() {
 sha() { git_ -C "$work/src/$1" rev-parse "$2^{commit}"; }
 
 # kb: a tool that prints its version (a file in the pattern), and a check on the consumer's
-# knowledge-base.yaml, skipped when it has none
+# knowledge-base.yaml, skipped when it has none. kb and nk name their provider file pattern.nix; the others keep
+# tuteur.nix, 0.2.0's name, which tuteur reads through 0.x
 prov kb
-cat > "$work/src/kb/tuteur.nix" <<'EOF'
+cat > "$work/src/kb/pattern.nix" <<'EOF'
 { pkgs, consumer, ... }:
 {
   tools.kb-lint = pkgs.writeShellScriptBin "kb-lint" "echo kb-lint ${builtins.readFile ./version}";
@@ -112,7 +113,7 @@ release kb v1.0.0
 
 # nk: needs kb, and uses its tool and its files
 prov nk
-cat > "$work/src/nk/tuteur.nix" <<EOF
+cat > "$work/src/nk/pattern.nix" <<EOF
 { pkgs, patterns, ... }:
 {
   requires.kb = "$(url kb)";
@@ -246,18 +247,28 @@ sec_mkflake() {
   refused "mkflake: and nix flake check" nix flake check --no-build
   ran "mkflake: tuteur's app still evaluates" nix eval --raw ".#apps.$sys.tuteur.type"
   refused "check: fails on it, from the repo's own app" g check
-  expect "says why" holds "tuteur: the flake's tools or checks don't evaluate (above): a provider's tuteur.nix fails"
+  expect "says why" holds "tuteur: the flake's tools or checks don't evaluate (above): a provider's pattern.nix fails"
   # one that doesn't parse breaks every output (Nix can't catch it): check from outside names it
   printf '{ pkgs, ... }: { tools.x = pkgs.hello;\n' > "$work/src/bad/tuteur.nix" && release bad v1.0.1
   git_ -C .patterns/bad fetch -q --tags && git_ -C .patterns/bad checkout -q --detach v1.0.1 && commit "bad v1.0.1"
   refused "check: a tuteur.nix that doesn't parse, from tuteur's own flake" G check -C .
-  expect "names it" holds "tuteur: .patterns/bad/tuteur.nix doesn't evaluate (above): every output of this flake fails until it does, tuteur's own app too; move the pattern back (git submodule update --recursive -- .patterns/bad), or from outside: nix run github:danielnaab/tuteur/v0.2.0 -- upgrade -C . bad@TAG"
+  expect "names it" holds "tuteur: .patterns/bad/tuteur.nix doesn't evaluate (above): every output of this flake fails until it does, tuteur's own app too; move the pattern back (git submodule update --recursive -- .patterns/bad), or from outside: nix run github:danielnaab/tuteur/v0.2.1 -- upgrade -C . bad@TAG"
   git_ rm -q .patterns/bad && commit "no bad"
 
   # a pattern with no tuteur.nix, and one with its own pinned source
   by_hand docs && by_hand lk && commit "docs, lk"
   ran "mkflake: a docs-only pattern beside providers; a provider's own pinned fetch" tools_out lk
   expect "the pinned source" has "pinned-dep-ok"
+
+  # a provider with both pattern.nix and tuteur.nix (one that still serves tuteur 0.2.0): pattern.nix is read
+  prov pn
+  printf '{ pkgs, ... }: { tools.pn = pkgs.writeShellScriptBin "pn" "echo from pattern.nix"; }\n' > "$work/src/pn/pattern.nix"
+  printf '{ pkgs, ... }: { tools.pn = pkgs.writeShellScriptBin "pn" "echo from tuteur.nix"; }\n' > "$work/src/pn/tuteur.nix"
+  release pn v1.0.0
+  by_hand pn && commit "pn"
+  ran "mkflake: pattern.nix before tuteur.nix" tools_out pn
+  expect "pattern.nix's tool" has "from pattern.nix"
+  git_ rm -q .patterns/pn && commit "no pn"
 
   # the repo's own tools, apps and checks (perSystem): merged like a provider's, named self
   # shellcheck disable=SC2016 # Nix's own expressions
@@ -1455,7 +1466,7 @@ EOF
   expect "holds the repo kit, with its file" holds '"self":{"file":"flake.nix (perSystem)","protect":["AGENTS.md"],"tools":["/nix/store/'
   expect "and the pattern kit, handed through unread" holds '"kk":{"commands":{"kk-tool":{"program":"/nix/store/'
   expect "naming its provider file" holds '"file":".patterns/kk/tuteur.nix"'
-  expect "pot protects every provider file, by either name, and the patterns folder" holds '"protect":["**/tuteur.nix","**/graft.nix",".patterns"]'
+  expect "pot protects every provider file, by either name, and the patterns folder" holds '"protect":["**/pattern.nix","**/tuteur.nix","**/graft.nix",".patterns"]'
   expect "its tools hold the repository's tuteur" test -x "$work/kpk/bin/tuteur"
   expect "and the repo kit's tools" test -x "$work/kpk/bin/hello"
   ran "kits: kitArgs reaches the provider" "$(jq -r '.scions.kk.commands["kk-tool"].program' "$work/kpk/kit.json")"
@@ -1589,7 +1600,7 @@ EOF
   expect "names the marker" holds "tuteur: the marker in scions/README.md is graft's name; 0.3.0 drops it: tuteur sync rewrites it"
   expect "names the workflow" holds "tuteur: .forgejo/workflows/graft-check.yaml is graft's name; 0.3.0 drops it: tuteur sync renames it to .forgejo/workflows/tuteur-check.yaml"
   expect "names the folder" holds "tuteur: the folder scions/, which mkFlake finds without dir, is graft's name; 0.3.0 drops it: keep it with dir = \"scions\"; in mkFlake, or move it to .patterns/ (0.3.0's Upgrading steps)"
-  expect "names the provider file" holds "tuteur: scions/ol/graft.nix is graft's name; 0.3.0 drops it: the provider ships tuteur.nix"
+  expect "names the provider file" holds "tuteur: scions/ol/graft.nix is graft's name; 0.3.0 drops it: the provider ships pattern.nix"
   expect "names the arguments" holds "tuteur: each of scion and scions, in scions/ol/graft.nix's arguments, is graft's name; 0.3.0 drops it: name them pattern and patterns"
   refuse "and not the input name graft (read through 0.x)" holds "input"
   ran "aliases: outdated reads tuteur's own input by graft's name" nix run .#tuteur -- outdated
