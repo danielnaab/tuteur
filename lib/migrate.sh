@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # migrate.sh [-C REPO] [--base REF] [--no-check] [--json]: a migration brief for a branch where an
-# upgrade is already applied (the bot's tuteur/upgrade, say): what moved, what upstream says about
+# upgrade is already applied (the bot's patterns/upgrade, say): what moved, what upstream says about
 # it, what in this repo refers to what moved, and what `nix flake check` says broke. Printed for an
 # agent or a person to act on; tuteur never runs an agent itself.
 #   nix run .#tuteur migrate | claude -p        (or: workmux add x -p "$(nix run .#tuteur migrate)")

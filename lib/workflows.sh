@@ -19,7 +19,7 @@
 #
 # A glob that could match a file tuteur-check reads is refused, since a push that changes only those
 # must be checked: one that starts with `*`, `/` or `.forgejo`, and one that could match a file in
-# .forgejo/ or .gitmodules, in a patterns folder DIR (default `patterns`), or the flake: FLAKEDIR's flake.nix and
+# .forgejo/ or .gitmodules, in a patterns folder DIR (default `.patterns`), or the flake: FLAKEDIR's flake.nix and
 # flake.lock at the top (FLAKEDIR `.`, the default), or anything in FLAKEDIR otherwise. Each glob
 # is read as a shell pattern, where `*` and `?` also match `/`, so it errs toward refusing.
 #
@@ -49,7 +49,6 @@ set -euo pipefail
 mode=$1 repo=$2 examples=$3 run=${4:-nix run .#tuteur} flakedir=${5:-.}
 shift $(($# < 5 ? $# : 5))
 marker='# managed by tuteur: '   # also lib/common.sh's WORKFLOW_MARKER, which says why there are copies
-old_marker='# managed by graft: '   # graft v2's, read through 0.2.x: refresh renames graft-NAME.yaml and rewrites it
 rc=0
 case $mode in check|refresh) ;; *) echo "usage: workflows.sh check|refresh REPO EXAMPLES [RUN [FLAKEDIR [DIR...]]]" >&2; exit 2 ;; esac
 
@@ -198,7 +197,7 @@ ssh_line() {
   local file=$1 wf=$2 line want="" got why
   local form='# tuteur ssh: host=[HOST]:PORT address=ADDRESS hostkey=TYPE KEY (address= and secret=NAME optional)'
   while IFS= read -r line || [ -n "$line" ]; do
-    [[ $line =~ ^[[:space:]]*#[[:space:]]*(tuteur|graft)\ ssh: ]] || continue
+    [[ $line =~ ^[[:space:]]*#[[:space:]]*tuteur\ ssh: ]] || continue
     why=$(ssh_parse "$line") || { echo "tuteur: $wf: its \"# tuteur ssh:\" line: $why; write it as $form" >&2; return 1; }
     ssh_parse "$line" >/dev/null
     got=$(ssh_form)
@@ -213,7 +212,8 @@ ssh_line() {
 # ssh_step: the step a `# tuteur ssh:` line asks for (ssh_parse's fields), and a blank line after it
 ssh_step() {
   local cfg="'Host $SSH_ALIAS'" names=$SSH_HOST secret="secrets.$SSH_SECRET" what="the $SSH_SECRET secret"
-  # the default secret, TUTEUR_SSH_KEY, else graft's GRAFT_SSH_KEY (an org setting, read through 0.2.x)
+  # the default secret, TUTEUR_SSH_KEY, else graft's GRAFT_SSH_KEY (an org setting, which only its owner can rename:
+  # read past 0.3.0)
   if [ "$SSH_SECRET" = TUTEUR_SSH_KEY ]; then secret="secrets.TUTEUR_SSH_KEY || secrets.GRAFT_SSH_KEY" what="the TUTEUR_SSH_KEY secret (or GRAFT_SSH_KEY)"; fi
   # ssh looks the key up under the name it connects to: with an address, that's the address
   if [ -n "$SSH_ADDR" ]; then cfg+=" '  HostName $SSH_ADDR'" names+=",${SSH_HOST/"$SSH_ALIAS"/"$SSH_ADDR"}"; fi
@@ -243,7 +243,7 @@ EOF
 
 # The steps of tuteur's workflows that run tuteur (and so fetch patterns)
 tuteur_steps=("      - name: Patterns registered and at release tags"
-             "      - name: Upgrade, check the result, push it to tuteur/upgrade"
+             "      - name: Upgrade, check the result, push it to patterns/upgrade"
              "      - name: Open (or update) the PR"
              "      - name: Signers (report-only)")
 
@@ -290,15 +290,7 @@ trap 'rm -f "$want" "$want.ssh" "$want.br"' EXIT
 for src in "$examples"/*; do
   [ -f "$src" ] || continue
   wf=.forgejo/workflows/${src##*/}
-  # graft's copy of this workflow (graft-NAME.yaml, its marker): refresh renames it (sync, in the migration from graft)
-  gwf=.forgejo/workflows/graft-${src##*/tuteur-}
-  if [ "$mode" = refresh ] && [ ! -e "$repo/$wf" ] && [ "$gwf" != "$wf" ] && [ -f "$repo/$gwf" ] && [ ! -L "$repo/$gwf" ] \
-      && grep -q "^$old_marker" "$repo/$gwf"; then
-    mv -- "$repo/$gwf" "$repo/$wf"
-    git -C "$repo" add -A -- "$gwf" "$wf" 2>/dev/null || true
-    echo "tuteur: renamed $gwf to $wf"
-  fi
-  if [ ! -f "$repo/$wf" ] || [ -L "$repo/$wf" ] || ! grep -qE "^($marker|$old_marker)" "$repo/$wf"; then continue; fi
+  if [ ! -f "$repo/$wf" ] || [ -L "$repo/$wf" ] || ! grep -q "^$marker" "$repo/$wf"; then continue; fi
   kept="tuteur: (paths-ignore, branches and the ssh line are the only edits tuteur keeps in $wf; to keep others, delete its \"$marker\" line)"
   if ! pi=$(paths_ignore "$repo/$wf" "$wf"); then
     echo "$kept" >&2

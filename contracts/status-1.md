@@ -93,7 +93,7 @@ A value that needs the network is never left out: when the upstream cannot be re
 | Status | When |
 |---|---|
 | 0 | the report was written, whatever state the patterns are in. `tuteur check` is the command that fails on them. |
-| 1 | the repository cannot be read: not a git work tree, two patterns folders, or graft v2.12's copy-mode README. The message, on stderr, names the fix. |
+| 1 | the repository cannot be read: not a git work tree, two patterns folders, or a README with graft v2's marker (since tuteur 0.3.0; graft v2.12's copy-mode README before). The message, on stderr, names the fix. |
 | 2 | a usage error: an unknown option or an argument. |
 
 Without `--json`, `tuteur status` prints a table, one row for tuteur's pin and one for each pattern, then each problem

@@ -27,7 +27,7 @@ and end with `tuteur check` passing and everything committed.
 1. At the top of the repository, write tuteur's template:
 
    ```
-   nix flake init -t github:danielnaab/tuteur/v0.2.1
+   nix flake init -t github:danielnaab/tuteur/v0.3.0
    ```
 
    It writes `flake.nix` and tuteur's two CI workflows in `.forgejo/workflows/`, and marks them for git
@@ -36,7 +36,7 @@ and end with `tuteur check` passing and everything committed.
    ```nix
    {
      inputs.self.submodules = true;
-     inputs.tuteur.url = "github:danielnaab/tuteur/v0.2.1";
+     inputs.tuteur.url = "github:danielnaab/tuteur/v0.3.0";
      outputs = inputs: inputs.tuteur.lib.mkFlake { inherit inputs; };
    }
    ```
@@ -45,7 +45,7 @@ and end with `tuteur check` passing and everything committed.
    (`refusing to overwrite existing file`), and exits 1. Then make three changes to your own flake, and keep
    everything else:
 
-   - Add `inputs.self.submodules = true;` and `inputs.tuteur.url = "github:danielnaab/tuteur/v0.2.1";`
+   - Add `inputs.self.submodules = true;` and `inputs.tuteur.url = "github:danielnaab/tuteur/v0.3.0";`
      (inside an `inputs = { … };` block, drop the `inputs.` prefix).
    - Name the outputs function's argument `inputs`, with `...`: `outputs = { self, nixpkgs, ... }@inputs:`.
    - Pass what the function returned as `mkFlake`'s `outputs`:
@@ -189,7 +189,7 @@ nix run '.#tuteur' check && git ls-files --error-unmatch flake.nix flake.lock .g
   cannot run then either: fill them with git, `git submodule update --init --recursive`.
 - **`Cannot find Git revision …`, from `nix run .#tuteur` on a clean tree.** Nix fetches every pattern at its
   gitlink before tuteur runs, and one is not on its provider's remote. Push it, or run tuteur from its own
-  flake, which does not evaluate yours: `nix run github:danielnaab/tuteur/v0.2.1 -- check -C .`.
+  flake, which does not evaluate yours: `nix run github:danielnaab/tuteur/v0.3.0 -- check -C .`.
 - **`tuteur: .gitmodules registers .patterns/knowledge-base-kit but the flake's source lacks it: add inputs.self.submodules = true; …`.**
   Your `flake.nix` lacks the line, or Nix is older than 2.27. Add it as in step 1.
 - **`tuteur: .patterns/knowledge-base-kit exists`.** The repository already has a folder of that name. Give

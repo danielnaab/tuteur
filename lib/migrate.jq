@@ -94,5 +94,5 @@ def delta: [if .added then "+\(.added)" else empty end, if .deleted and .deleted
   # 6. done when
   "## Done when",
   "",
-  "\($check) \($pass), with \($dirtext) and the pins as tuteur left them. Commit on the branch you're on (this brief was made on \($branch | safe)), one line per file changed in the message. If nothing here needs to change, say so and commit nothing.\(if $b.branch == "tuteur/upgrade" then " The weekly tuteur upgrade run force-pushes tuteur/upgrade: work on a branch made from it, or merge before then." else "" end)"
+  "\($check) \($pass), with \($dirtext) and the pins as tuteur left them. Commit on the branch you're on (this brief was made on \($branch | safe)), one line per file changed in the message. If nothing here needs to change, say so and commit nothing.\(if $b.branch == "patterns/upgrade" then " The weekly tuteur upgrade run force-pushes patterns/upgrade: work on a branch made from it, or merge before then." else "" end)"
   end

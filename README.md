@@ -14,8 +14,9 @@ repository publishes it, with version tags. tuteur adds the provider to your rep
 at one release, in the `.patterns/` folder. In gardening, a tuteur is the stake a young plant is trained on:
 the plant grows freely, but it is tied in along the support, and a shoot that grows the wrong way is pruned.
 
-tuteur was called graft until v2.22.0; [Move from graft v2](docs/guides/move-from-graft.md) is the one pull
-request each graft consumer makes.
+tuteur was called graft until v2.22.0. A graft consumer moves to tuteur 0.2.1 with one pull request
+([Move from graft v2](docs/guides/move-from-graft.md)), then takes 0.3.0 by its [Upgrading](CHANGELOG.md#v030---2026-11-27)
+steps.
 
 ## An example: a knowledge base that agents write
 
@@ -109,7 +110,7 @@ Compared with the other ways:
 Nix 2.27 or later, with flakes. In a git repository:
 
 ```
-nix flake init -t github:danielnaab/tuteur/v0.2.1
+nix flake init -t github:danielnaab/tuteur/v0.3.0
 ```
 
 It writes tuteur's CI workflows and this `flake.nix`:
@@ -117,7 +118,7 @@ It writes tuteur's CI workflows and this `flake.nix`:
 ```nix
 {
   inputs.self.submodules = true;
-  inputs.tuteur.url = "github:danielnaab/tuteur/v0.2.1";
+  inputs.tuteur.url = "github:danielnaab/tuteur/v0.3.0";
   # Where agents or kit commands run under pot, take pot too (mkFlake then builds pot-kits):
   #   inputs.pot.url = "github:danielnaab/pot/v0.3.0";
   outputs = inputs: inputs.tuteur.lib.mkFlake { inherit inputs; };

@@ -68,7 +68,7 @@
         description = "A repository held to other repositories' patterns, with tuteur's Forgejo workflows";
         welcomeText = ''
           Add a first pattern (a git submodule at its newest release tag), then commit:
-            nix run github:danielnaab/tuteur/v0.2.1 -- add -C . URL
+            nix run github:danielnaab/tuteur/v0.3.0 -- add -C . URL
           See https://github.com/danielnaab/tuteur.
         '';
       };

@@ -82,10 +82,12 @@ tuteur was graft until v2.22.0. The nouns that changed:
 | `scion`, `scions` (a provider's arguments) | `pattern`, `patterns` |
 | a new major version | a breaking version (a new major, or a new `0.y`) |
 | `graft-check.yaml`, `graft-upgrade.yaml`, `graft-signers.yaml` | `tuteur-check.yaml`, `tuteur-upgrade.yaml`, `tuteur-signers.yaml` |
+| `graft/upgrade` (the weekly branch) | `patterns/upgrade` (`tuteur/upgrade` before 0.3.0) |
 
-tuteur 0.2.x still reads graft's names; `tuteur check` says which this repository uses, and 0.3.0 drops them
-([Move from graft v2](guides/move-from-graft.md)). `tuteur.nix`, the provider file's name before 0.2.1, is read
-through 0.x.
+tuteur 0.2.x read graft's names, and 0.3.0 dropped them, but for the flake input name `graft` (read through 0.x)
+and the secrets `GRAFT_PR_TOKEN` and `GRAFT_SSH_KEY` (read after the new ones): a graft consumer moves through
+tuteur 0.2.x first ([Move from graft v2](guides/move-from-graft.md)). `tuteur.nix`, the provider file's name
+before 0.2.1, is read through 0.x.
 
 ## The git and Nix binding
 

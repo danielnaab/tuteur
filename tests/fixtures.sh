@@ -45,16 +45,13 @@
 #                   v1.1.0 and runs note-lint in its own check (perSystem), committed and passing
 #   worktrees       team-kb/ adding page-rules and style-guide, committed, with one more branch `draft`;
 #                   clone-only/ (git clone without --recurse-submodules: the patterns are empty)
-#   copy-mode       old/: a graft v2.12 consumer to move (flake.nix with a `flake = false` provider input,
-#                   .patterns/ a committed copy with the v2.12 README table; no flake.lock), and page-rules.git,
-#                   its provider, at v1.0.0
 #
 # Needs nix, git 2.38 or later and jq. No network for the providers; checks use the nixpkgs tuteur's
-# flake.lock pins (likely cached). copy-mode's old/ names github:danielnaab/tuteur/v2.12.0.
+# flake.lock pins (likely cached).
 set -euo pipefail
 
 src=$(cd "$(dirname "$0")/.." && pwd)
-slices="first-pattern check-fails fix-a-provider gate-merges private ci breaking-change upgrade publish worktrees copy-mode"
+slices="first-pattern check-fails fix-a-provider gate-merges private ci breaking-change upgrade publish worktrees"
 usage="usage: fixtures.sh ${slices// /|} OUT"
 slice=${1:?$usage}
 out=${2:?$usage}
@@ -294,11 +291,11 @@ set -euo pipefail
 cd "\$1"
 t=\$(mktemp -d)
 listing=/nonexistent
-if [ "\${2:-}" = open ]; then echo '[{"number": 7, "head": {"ref": "tuteur/upgrade", "repo_id": 1}, "base": {"repo_id": 1}}]' > "\$t/listing"; listing=\$t/listing; fi
+if [ "\${2:-}" = open ]; then echo '[{"number": 7, "head": {"ref": "patterns/upgrade", "repo_id": 1}, "base": {"repo_id": 1}}]' > "\$t/listing"; listing=\$t/listing; fi
 nix run "$nixpkgs#python3" -- "$out/stub-api.py" "\$t/port" "\$t/auth" "\$t/req" "\$listing" & stub=\$!
 trap 'kill \$stub 2>/dev/null; rm -rf "\$t"' EXIT
 for _ in \$(seq 100); do [ -s "\$t/port" ] && break; sleep 0.1; done
-API="http://127.0.0.1:\$(cat "\$t/port")" WEB="http://forgejo.example/team/\$(basename "\$PWD")" BASE=main BRANCH=tuteur/upgrade PR_TOKEN=x \\
+API="http://127.0.0.1:\$(cat "\$t/port")" WEB="http://forgejo.example/team/\$(basename "\$PWD")" BASE=main BRANCH=patterns/upgrade PR_TOKEN=x \\
   nix run .#tuteur -- ci pr || true
 jq -r 'select(.method != "GET") | "\\(.method) \\(.path)\\n\\nTitle: \\(.body.title)\\n\\n\\(.body.body)"' "\$t/req"
 EOF
@@ -390,38 +387,6 @@ worktrees() {
   g clone -q "$c" "$out/clone-only"
 }
 
-copy_mode() {
-  local c=$out/old r
-  page_rules
-  r=$(g -C "$out/src/page-rules" rev-parse v1.0.0)
-  repo "$c"
-  mkdir -p "$c/.patterns/page-rules"
-  cat > "$c/flake.nix" <<EOF
-{
-  inputs = {
-    tuteur.url = "github:danielnaab/tuteur/v2.12.0";
-    page-rules = { url = "git+$(url page-rules)?ref=v1.0.0&exportIgnore=1"; flake = false; };
-  };
-  outputs = inputs: inputs.tuteur.lib.mkFlake { inherit inputs; };
-}
-EOF
-  g -C "$out/src/page-rules" archive v1.0.0 | tar -C "$c/.patterns/page-rules" -xf -
-  cat > "$c/.patterns/README.md" <<EOF
-<!-- managed by tuteur: https://github.com/danielnaab/tuteur -->
-# .patterns/
-
-Patterns: each folder is another repository's export, added here by
-[tuteur](https://github.com/danielnaab/tuteur) at the commit pinned in \`flake.lock\`. Do not edit
-them. To upgrade: \`nix run .#tuteur upgrade\` (or change the tag in \`flake.nix\`, then
-\`nix run .#tuteur\`), then commit. \`nix flake check\` fails if this directory drifts from the pins.
-
-| Scion | Commit |
-|---|---|
-| [page-rules](page-rules/) | \`$r\` |
-EOF
-  g -C "$c" add -A && g -C "$c" commit -qm "graft v2.12, copy mode"
-}
-
 case $slice in
   first-pattern) first_pattern ;;
   check-fails) check_fails ;;
@@ -433,6 +398,5 @@ case $slice in
   upgrade) upgrade_fixture ;;
   publish) publish ;;
   worktrees) worktrees ;;
-  copy-mode) copy_mode ;;
 esac
 echo "fixtures.sh: $slice in $out (first, in your shell: . $out/env.sh)"

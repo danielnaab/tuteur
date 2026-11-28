@@ -41,7 +41,7 @@ More of the same rule:
 - **`nix run .#tuteur` fetches first.** On a clean tree, `nix run .#tuteur …` (sync, check, upgrade) fetches every
   pattern at its gitlink before tuteur runs. A gitlink the provider's remote lacks (an unpushed fix) fails there
   with `Cannot find Git revision …`; run tuteur from its own flake instead:
-  `nix run github:danielnaab/tuteur/v0.2.1 -- check -C .`.
+  `nix run github:danielnaab/tuteur/v0.3.0 -- check -C .`.
 - **A stale pattern.** After `git pull` without `submodule.recurse`, a pattern can be checked out at an older commit
   than the gitlink (`git submodule status` shows `+`). The clean tree builds the gitlink; the same commit with a
   note edited builds the old checkout. `tuteur check` fails on `+`. **tested**

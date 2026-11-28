@@ -183,7 +183,7 @@ curl -fsS -H "Authorization: token $FORGEJO_TOKEN" "https://forgejo.example/api/
 - **The check names no page, and passes, though a page breaks the rule.** The provider's check reads a
   settings file that is absent, and skips. Write it (step 2).
 - **tuteur's upgrade pull request says `Some required checks are missing.`** No workflow ran on its newest
-  commit. tuteur's upgrade job pushes `tuteur/upgrade` with the job token, and Forgejo starts no workflow for
+  commit. tuteur's upgrade job pushes `patterns/upgrade` with the job token, and Forgejo starts no workflow for
   that push. Your workflow runs only when tuteur opens the pull request with `TUTEUR_PR_TOKEN`, a user's
   token. It does not run when tuteur opens the pull request with the job token, or when a later week's
   upgrade updates it. The upgrade job has already run your whole `nix flake check` on the branch: if it

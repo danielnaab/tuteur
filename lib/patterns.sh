@@ -61,11 +61,10 @@ nested() {
 }
 
 # A flake at the repo's top must declare inputs.self.submodules, or a git flake sees no patterns. A
-# flake that can't (tuteur's own, used as a path: input) says so with `# tuteur: no self.submodules` (or graft's
-# `# graft: no self.submodules`).
+# flake that can't (tuteur's own, used as a path: input) says so with `# tuteur: no self.submodules`.
 declares_submodules() {
   grep -qE '(self\.submodules|submodules)[[:space:]]*=[[:space:]]*true' "$FLAKE_NIX" \
-    || grep -qF -e '# tuteur: no self.submodules' -e '# graft: no self.submodules' "$FLAKE_NIX"
+    || grep -qF -e '# tuteur: no self.submodules' "$FLAKE_NIX"
 }
 
 # submodules_problem N: tuteur check's message when a top-level git flake with N patterns doesn't declare
@@ -81,12 +80,10 @@ cmd_add() {
   while [ $# -gt 0 ]; do
     case $1 in
       -C) if [ $# -lt 2 ] || [ -z "$2" ]; then die "-C needs a repository"; fi; repo=$2; shift 2 ;;
-      --dir|--scions)
+      --dir)
         if [ $# -lt 2 ] || [ -z "$2" ]; then die "$1 needs a path from the repo's top, like nix/agent-tools/.patterns"; fi
-        [ "$1" != --scions ] || alias_line "--scions" "use --dir"
         patterns=$2; shift 2 ;;
       --dir=*) patterns=${1#--dir=}; shift ;;
-      --scions=*) alias_line "--scions" "use --dir"; patterns=${1#--scions=}; shift ;;
       -h|--help) sed -n '4,7p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
       -*) die "unknown option $1 (usage: tuteur add [-C REPO] [--dir PATH] URL[@TAG] [NAME])" ;;
       *) if [ -z "$spec" ]; then spec=$1; elif [ -z "$name" ]; then name=$1; else die "usage: tuteur add [-C REPO] [--dir PATH] URL[@TAG] [NAME]"; fi; shift ;;
@@ -222,10 +219,6 @@ try_problem() {
     committed) echo "$TRY is committed (tuteur try's marker): tuteur try --stop, then commit its removal" ;;
     left) echo "$TRY is left from tuteur try but untracked, so Nix builds read the recorded patterns: tuteur try --stop removes it, or tuteur try turns try on again" ;;
   esac
-  # graft try's marker (graft v2): Nix reads the working tree while it is marked, as with tuteur's
-  if [ -n "$(git ls-files -- "$OLD_TRY")" ] || [ -e "$OLD_TRY" ]; then
-    echo "$OLD_TRY is graft try's marker: tuteur try --stop removes it (then commit, if its removal is staged)"
-  fi
 }
 
 # stray_patterns REGISTERED: what is in the patterns folder that .gitmodules (REGISTERED: patterns_registered's
@@ -354,10 +347,14 @@ cmd_check() {
       n=$((n + 1))
       if [ -z "$committed" ] && [ -n "$SF_FILLED" ] && [ -n "$url" ]; then
         nested "$name" "$path"
-        # a tuteur.nix that doesn't parse breaks every output of the flake, tuteur's app too
+        # a pattern.nix that doesn't parse breaks every output of the flake, tuteur's app too
         if pf=$(provider_file "$path") && ! err=$(nix_ eval --impure --expr "builtins.isFunction (import $(pwd -P)/$pf)" 2>&1); then
           echo "$err" | tail -5 >&2
-          bad "$pf doesn't evaluate (above): every output of this flake fails until it does, tuteur's own app too; move the pattern back (git submodule update --recursive -- $path), or from outside: nix run github:danielnaab/tuteur/v0.2.1 -- upgrade -C . $name@TAG"
+          bad "$pf doesn't evaluate (above): every output of this flake fails until it does, tuteur's own app too; move the pattern back (git submodule update --recursive -- $path), or from outside: nix run github:danielnaab/tuteur/v0.3.0 -- upgrade -C . $name@TAG"
+        fi
+        # graft v2's provider file alone: tuteur reads it no more, so the provider's tools, checks and kit are gone
+        if ! provider_file "$path" >/dev/null && [ -f "$path/graft.nix" ]; then
+          bad "$path/graft.nix is graft v2's provider file, which tuteur 0.3.0 no longer reads (it reads pattern.nix, then tuteur.nix): take a release of $name that ships pattern.nix (ask its maintainers), or stay on tuteur 0.2.x until there is one"
         fi
       fi
     done <<<"$registered"
@@ -398,10 +395,8 @@ cmd_check() {
     fi
   fi
   # the marker README: the text this tuteur writes, from the repository's own app (which knows how it runs
-  # tuteur), once every pattern is filled (an empty one's guide can't be told). graft's README is an alias
-  # through 0.2.x: aliases_in_use names it, and sync rewrites it
+  # tuteur), once every pattern is filled (an empty one's guide can't be told)
   if [ -z "$committed" ] && [ -n "${TUTEUR_IN_REPO:-}" ] && [ -n "$PATTERNS" ] \
-     && ! grep -qsF -- "$OLD_MARKER" "$PATTERNS/README.md" \
      && rt=$(bash "$here/patterns-readme.sh" text "$PATTERNS" "$TUTEUR_RUN" 2>/dev/null); then
     if [ -L "$PATTERNS/README.md" ]; then
       bad "$PATTERNS/README.md is a symbolic link; tuteur writes only a file there: remove it, then tuteur sync"
@@ -413,7 +408,12 @@ cmd_check() {
       fi
     fi
   fi
-  [ -n "$committed" ] || aliases_in_use
+  # graft v2's marked workflows run nix run .#graft, an app tuteur 0.3.0 doesn't give; tuteur 0.2.x's sync renamed them
+  for p in .forgejo/workflows/graft-*.yaml; do
+    if [ -f "$p" ] && grep -q "^# managed by graft: " "$p"; then
+      bad "$p is graft v2's workflow, which runs nix run .#graft, an app tuteur 0.3.0 doesn't give: copy tuteur's tuteur-${p##*/graft-} (template/.forgejo/workflows/) into .forgejo/workflows/ in its place, then tuteur sync; or $FROM_GRAFT"
+    fi
+  done
   if [ "$rc" = 0 ] && [ -n "$PATTERNS" ]; then
     local noun=patterns
     [ "$n" != 1 ] || noun=pattern
@@ -421,31 +421,6 @@ cmd_check() {
     else echo "tuteur: $n $noun clean and at release tags"; fi
   fi
   return "$rc"
-}
-
-# aliases_in_use: one line each (alias_line, never a failure) for the names of graft's that tuteur 0.2.x still reads
-# and this repository uses: the app graft, the patterns README's old marker, graft's marked workflows, and what
-# mkFlake reports (the folder found by graft's default name, a provider's graft.nix, the arguments scion and
-# scions). The input name graft is read through 0.x, so it gets no line.
-aliases_in_use() {
-  local f system json t w
-  [ "${TUTEUR_VIA:-}" != graft ] || alias_line "the app graft (nix run .#graft)" "run nix run .#tuteur (tuteur sync renames graft's workflows, which run the old name)"
-  if [ -n "$PATTERNS" ] && grep -qsF -- "$OLD_MARKER" "$PATTERNS/README.md"; then
-    alias_line "the marker in $PATTERNS/README.md" "tuteur sync rewrites it"
-  fi
-  for f in .forgejo/workflows/graft-*.yaml; do
-    if [ ! -f "$f" ] || ! grep -q "^# managed by graft: " "$f"; then continue; fi
-    alias_line "$f" "tuteur sync renames it to ${f/graft-/tuteur-}"
-  done
-  if [ -n "${TUTEUR_IN_REPO:-}" ] && [ -n "$PATTERNS" ]; then
-    system=$(nix_ eval --impure --raw --expr builtins.currentSystem) || return 0
-    # (a flake whose tools mkFlake did not make has none)
-    json=$(nix_ eval --json "$FLAKE_REF#packages.$system.tools.passthru.tuteurAliases" 2>/dev/null) || json='[]'
-    while IFS=$'\t' read -r t w; do
-      [ -z "$t" ] || alias_line "$t" "$w"
-    done < <(jq -r '.[]? | "\(.thing)\t\(.todo)"' <<<"$json" 2>/dev/null || true)
-  fi
-  return 0
 }
 
 # latest_json URL ROW REASON: status/1's latest, from one of tuteur outdated's rows (row's fields) and
@@ -472,7 +447,7 @@ tuteur_pin_json() {
   [ -n "$own" ] || { echo null; return; }
   n=$(lock_node "$FLAKE_LOCK" "$own")
   if [ -z "$n" ] || patterns_registered .gitmodules | cut -f1 | grep -qxF "$own"; then echo null; return; fi
-  url=$(remote "$n"); ref=$(jq -r '.original.ref // empty' <<<"$n"); rev=$(jq -r '.locked.rev // empty' <<<"$n")
+  url=$(remote "$n"); ref=$(pin_ref "$n"); rev=$(jq -r '.locked.rev // empty' <<<"$n")
   if [ -n "$url" ] && is_semver "$ref"; then
     tag=$ref
     IFS=$'\t' read -r -a r < <(row "$own" - "$url" "$ref" 2>/dev/null)
@@ -704,12 +679,6 @@ cmd_try() {
 # touches a pattern.
 try_stop() {
   local state name path url head link
-  # graft try's marker (graft v2)
-  if [ -n "$(git ls-files -- "$OLD_TRY")" ] || [ -e "$OLD_TRY" ]; then
-    [ -z "$(git ls-files -- "$OLD_TRY")" ] || git update-index --force-remove -- "$OLD_TRY"
-    rm -f -- "$OLD_TRY"
-    echo "tuteur: removed $OLD_TRY, graft try's marker"
-  fi
   state=$(try_state)
   if [ -z "$state" ]; then echo "tuteur: try is not on; nothing to undo"; return 0; fi
   [ -z "$(git ls-files -- "$TRY")" ] || git update-index --force-remove -- "$TRY"

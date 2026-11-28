@@ -90,7 +90,6 @@ nix run .#tuteur check
 - **`tuteur: .patterns/kits.just's recipe X has the name of the justfile's own X: …`.** A kit's recipe never
   replaces the consumer's own; rename one of the two.
 - **`pot: …` while `pot-kits` builds.** pot's check of the kit: see pot's guide.
-- **``tuteur: FILE gives `sandbox`: graft v2.15.0 replaced it with `kit` ``.** Give `kit` instead.
 
 ## Sources
 

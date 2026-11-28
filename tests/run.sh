@@ -252,7 +252,7 @@ sec_mkflake() {
   printf '{ pkgs, ... }: { tools.x = pkgs.hello;\n' > "$work/src/bad/tuteur.nix" && release bad v1.0.1
   git_ -C .patterns/bad fetch -q --tags && git_ -C .patterns/bad checkout -q --detach v1.0.1 && commit "bad v1.0.1"
   refused "check: a tuteur.nix that doesn't parse, from tuteur's own flake" G check -C .
-  expect "names it" holds "tuteur: .patterns/bad/tuteur.nix doesn't evaluate (above): every output of this flake fails until it does, tuteur's own app too; move the pattern back (git submodule update --recursive -- .patterns/bad), or from outside: nix run github:danielnaab/tuteur/v0.2.1 -- upgrade -C . bad@TAG"
+  expect "names it" holds "tuteur: .patterns/bad/tuteur.nix doesn't evaluate (above): every output of this flake fails until it does, tuteur's own app too; move the pattern back (git submodule update --recursive -- .patterns/bad), or from outside: nix run github:danielnaab/tuteur/v0.3.0 -- upgrade -C . bad@TAG"
   git_ rm -q .patterns/bad && commit "no bad"
 
   # a pattern with no tuteur.nix, and one with its own pinned source
@@ -331,10 +331,10 @@ sec_mkflake() {
   expect "says so" holds "tuteur: mkFlake's dir must be one folder name (letters, digits, . _ -; not ., .. or .git), got \"a/b\""
   sed -i 's|mkFlake { inherit inputs; dir = "a/b"; }|mkFlake { inherit inputs; }|' flake.nix && git_ rm -rq docs && commit "dir back"
 
-  # a copy-mode patterns README (graft v2.12): the upgrade steps, not a confusing error
-  cp .patterns/README.md "$work/readme" && printf '\n| Scion | Commit |\n|---|---|\n' >> .patterns/README.md && commit "copy mode"
-  refused "mkflake: a copy-mode patterns README" nix build --no-link .#tools
-  expect "points to the Upgrading steps" holds "tuteur: .patterns/README.md is graft's copy-mode README (v2.12 or earlier): graft v2.13.0 pins scions with git submodules; follow the Upgrading steps of v2.13.0 in graft's CHANGELOG.md"
+  # graft v2's marker README (a repository not moved from graft's names): the way on, not a confusing error
+  cp .patterns/README.md "$work/readme" && sed -i 's|<!-- managed by tuteur: https://github.com/danielnaab/tuteur -->|<!-- managed by graft: https://github.com/danielnaab/graft -->|' .patterns/README.md && commit "graft's marker"
+  refused "mkflake: graft's marker README" nix build --no-link .#tools
+  expect "points to tuteur 0.2.x and the Upgrading steps" holds "tuteur: .patterns/README.md carries graft's marker (graft v2): tuteur 0.3.0 no longer reads graft's names: move with tuteur 0.2.x first (its guide Move from graft v2), then follow v0.3.0's Upgrading steps in tuteur's CHANGELOG.md"
   cp "$work/readme" .patterns/README.md && commit "readme back"
 
   # A flake in a subdirectory, run as path: (keeps the rest of the repo out of the store): the
@@ -589,14 +589,14 @@ sec_check() {
   ran "check --committed: what a commit holds, with no pattern filled" g check --committed
   expect "says so" has "tuteur: 3 patterns registered and at release tags"
   cd "$work/cmd"
-  # two patterns folders, a copy-mode README
+  # two patterns folders, graft's marker README
   mkdir -p other && cp .patterns/README.md other/ && git_ add other
   refused "check: two patterns folders" g check
   expect "names both" has "tuteur: two patterns folders: .patterns, other; tuteur supports one per repository"
   git_ rm -rqf other
-  cp .patterns/README.md "$work/readme" && printf '| Scion | Commit |\n' >> .patterns/README.md && git_ add .patterns/README.md
-  refused "check: a copy-mode README" G check -C .
-  expect "points to the Upgrading steps" holds "tuteur: .patterns/README.md is graft's copy-mode README (v2.12 or earlier)"
+  cp .patterns/README.md "$work/readme" && sed -i 's|<!-- managed by tuteur: https://github.com/danielnaab/tuteur -->|<!-- managed by graft: https://github.com/danielnaab/graft -->|' .patterns/README.md && git_ add .patterns/README.md
+  refused "check: graft's marker README" G check -C .
+  expect "points to tuteur 0.2.x first" holds "tuteur: .patterns/README.md carries graft's marker (graft v2): tuteur 0.3.0 no longer reads graft's names: move with tuteur 0.2.x first (https://github.com/danielnaab/tuteur/blob/v0.2.1/docs/guides/move-from-graft.md)"
   cp "$work/readme" .patterns/README.md && git_ add .patterns/README.md
   expect "check: back to clean" quiet g check
 }
@@ -943,9 +943,6 @@ sec_tuteur() {
   expect "tuteur: check, a pin it can't fetch: says so" holds "tuteur: can't fetch tuteur's v9.1.0 from file://$gr"
   refuse "and fails nothing on it" holds "with narHash"
   cp "$work/lock-good" flake.lock
-  # v2.12's upgrade, moving its tuteur to this version, runs this version's lib/assemble.sh: a stub
-  refused "tuteur: lib/assemble.sh (what a v2.12 upgrade runs) stops it" bash "$tuteur/lib/assemble.sh" out patterns x=y=z
-  expect "naming the Upgrading steps" holds "graft v2.13.0 replaced copied scions with git submodules"
   # tuteur's own pin in a 0.y series, as every pin of tuteur is from 0.1.0: v0.1.1 taken, v0.2.0 held, and
   # NAME@TAG crosses. A consumer's inputs.pot at a version tag moves by the same rule, through flake.nix and
   # flake.lock alone: only tuteur's own input runs the new version's lib/refresh.sh
@@ -988,6 +985,19 @@ sec_tuteur() {
   sed -i "s|inputs.pot.url = \"git+file://$pr?ref=v0.1.1\";|inputs.pot.url = \"git+file://$pr\";|" flake.nix && quiet nix flake lock && commit "pot by branch"
   ran "tuteur: outdated, pot at a branch" g outdated
   refuse "no row for pot" grep -qE "^pot " <<<"$out"
+  # a git input's tag spelled ref=refs/tags/vX (a remote git+https input needs it: Nix reads a bare ref as a branch)
+  local rt=$work/self-reftags
+  consumer "$rt" "$(printf '  inputs.self.submodules = true;\n  inputs.tuteur.url = "git+file://%s?ref=refs/tags/v9.0.0";\n  outputs = inputs: inputs.tuteur.lib.mkFlake { inherit inputs; };' "$gr")"
+  cd "$rt" && commit init && quiet nix flake lock && commit lock
+  ran "tuteur: outdated, a pin at ref=refs/tags/v9.0.0" G outdated -C .
+  expect "is the tag v9.0.0" grep -qE "^tuteur +- +v9.0.0 +v9.1.0 +outdated +v10.0.0$" <<<"$out"
+  ran "tuteur: status --json, a pin at ref=refs/tags/v9.0.0" stdout_of G status -C . --json
+  expect "its tag v9.0.0" quiet jq -e '.graft.tag == "v9.0.0" and .graft.latest.status == "outdated"' <<<"$out"
+  ran "tuteur: upgrade, a pin at ref=refs/tags/v9.0.0" env XDG_CACHE_HOME="$work/xdg-reftags" nix run .#tuteur -- upgrade
+  expect "moves it" has "tuteur: tuteur v9.0.0 -> v9.1.0"
+  expect "spelled as it was" grep -qF "ref=refs/tags/v9.1.0\";" flake.nix
+  # shellcheck disable=SC2016 # jq's $r
+  expect "re-locked" quiet jq -e --arg r "$(git_ -C "$gr" rev-parse v9.1.0)" '.nodes.tuteur.locked.rev == $r' flake.lock
   cd "$work"
 }
 
@@ -1042,7 +1052,7 @@ sec_workflows() {
   expect "workflows: ssh: tuteur-check: the key before the check" test "$steps" = '["Checkout","SSH key for private patterns","Patterns registered and at release tags"]'
   steps=$(nix run "$np#yq-go" -- -o=json -I=0 '[.jobs[].steps[] | .name]' "$wr/.forgejo/workflows/tuteur-upgrade.yaml")
   expect "workflows: ssh: tuteur-upgrade: the key before the upgrade and the PR" \
-    test "$steps" = '["Checkout the default branch","SSH key for private patterns","Upgrade, check the result, push it to tuteur/upgrade","Checkout the default branch","SSH key for private patterns","Open (or update) the PR"]'
+    test "$steps" = '["Checkout the default branch","SSH key for private patterns","Upgrade, check the result, push it to patterns/upgrade","Checkout the default branch","SSH key for private patterns","Open (or update) the PR"]'
   srun=$(nix run "$np#yq-go" -- '.jobs.patterns.steps[1].run' "$wf")
   expect "workflows: ssh: known_hosts under the host and its address" grep -qxF "echo '[git.example]:2222,[192.0.2.7]:2222 $hk' >> ~/.ssh/known_hosts" <<<"$srun"
   sk=$work/ssh-home && mkdir -p "$sk"
@@ -1082,7 +1092,7 @@ stub_pr() {
   rm -f "$port"
   nix run "$np#python3" -- "$src/tests/stub-api.py" "$port" "$work/$1.auth" "$work/$1.req" "${2:-/nonexistent}" ${3:+"$3"} & stub=$!
   for _ in $(seq 100); do [ -s "$port" ] && break; sleep 0.1; done
-  ci_ API="http://127.0.0.1:$(cat "$port")" WEB=x BASE=main BRANCH=tuteur/upgrade PR_TOKEN=s3cret \
+  ci_ API="http://127.0.0.1:$(cat "$port")" WEB=x BASE=main BRANCH=patterns/upgrade PR_TOKEN=s3cret \
     pr > "$work/$1.out" 2>&1 || rc=$?
   echo "$rc" > "$work/$1.rc"
   kill "$stub" 2>/dev/null || true
@@ -1121,27 +1131,32 @@ sec_ci() {
   ran "ci check: passes on a fresh clone (no pattern filled)" ci_ check
   expect "says so" has "tuteur: ci check passed: flake.lock is committed, every pattern is at a release tag, tuteur's workflows are current, and the flake evaluates"
   refused "ci upgrade: refuses without BRANCH" ci_ upgrade
-  expect "says so" has "tuteur: BRANCH is not set: name the branch to push the upgrade to (tuteur's workflow sets BRANCH=tuteur/upgrade)"
-  refused "ci upgrade: refuses to commit on the default branch" ci_ BRANCH=tuteur/upgrade upgrade
-  expect "says so" has "tuteur: ci upgrade commits on the branch checked out, main, and pushes it to tuteur/upgrade: switch to a new branch tuteur/upgrade first (git switch -c tuteur/upgrade)"
-  git_ checkout -q -b tuteur/upgrade
+  expect "says so" has "tuteur: BRANCH is not set: name the branch to push the upgrade to (tuteur's workflow sets BRANCH=patterns/upgrade)"
+  refused "ci upgrade: refuses to commit on the default branch" ci_ BRANCH=patterns/upgrade upgrade
+  expect "says so" has "tuteur: ci upgrade commits on the branch checked out, main, and pushes it to patterns/upgrade: switch to a new branch patterns/upgrade first (git switch -c patterns/upgrade)"
+  git_ checkout -q -b patterns/upgrade
   echo "SECRET=x" > .env.local
-  refused "ci upgrade: refuses an untracked file" ci_ BRANCH=tuteur/upgrade upgrade
+  refused "ci upgrade: refuses an untracked file" ci_ BRANCH=patterns/upgrade upgrade
   expect "says why" has "tuteur: ci upgrade commits every change in the working tree, and this one has the changes of its own above: commit, stash or remove them first"
   rm -f .env.local
   # the workflow fills the patterns before ci upgrade (tuteur-upgrade.yaml), so the README can link their guides
   git_ submodule update -q --init --recursive
+  # tuteur/upgrade, the branch tuteur 0.2.x's job pushed (its commit, as that job wrote it): deleted once the new one is pushed
+  git_ -c user.name=tuteur-upgrade -c user.email=tuteur-upgrade@noreply.invalid commit -q --allow-empty -m "tuteur: upgrade" -m "tuteur: pa v1.1.0 -> v1.1.0"
+  git_ push -q origin HEAD:refs/heads/tuteur/upgrade && git_ reset -q --hard HEAD~1
   # C1: the check after the upgrade sees the NEW pattern (committed first, then checked)
-  ran "ci upgrade: moves pa and checks the result" ci_ GITHUB_OUTPUT="$work/ci-out" BRANCH=tuteur/upgrade upgrade
+  ran "ci upgrade: moves pa and checks the result" ci_ GITHUB_OUTPUT="$work/ci-out" BRANCH=patterns/upgrade upgrade
   expect "changed=true" grep -qx changed=true "$work/ci-out"
   expect "the check saw the new version (its own check wants v1.2.0)" has "tuteur: checks.$sys.pa-version"
   refuse "and nothing failed" holds "::error::"
-  body=$(git_ -C "$work/gate-ok.git" log -1 --format=%b tuteur/upgrade)
+  body=$(git_ -C "$work/gate-ok.git" log -1 --format=%b patterns/upgrade)
   expect "pushed, its commit naming the move" grep -qx "tuteur: pa v1.1.0 -> v1.2.0" <<<"$body"
-  expect "the gitlink pushed" test "$(git_ -C "$work/gate-ok.git" ls-tree tuteur/upgrade .patterns/pa | awk '{ print $3 }')" = "$(sha pa v1.2.0)"
-  expect "and the README, pa's guide gone" grep -qxF -- '- [pa](pa/README.md) (it has no USING.md: its README)' <(git_ -C "$work/gate-ok.git" show tuteur/upgrade:.patterns/README.md)
+  expect "the gitlink pushed" test "$(git_ -C "$work/gate-ok.git" ls-tree patterns/upgrade .patterns/pa | awk '{ print $3 }')" = "$(sha pa v1.2.0)"
+  expect "and the README, pa's guide gone" grep -qxF -- '- [pa](pa/README.md) (it has no USING.md: its README)' <(git_ -C "$work/gate-ok.git" show patterns/upgrade:.patterns/README.md)
+  expect "ci upgrade: deletes tuteur/upgrade, the old job's branch" has "tuteur: deleted tuteur/upgrade, the upgrade branch before tuteur 0.3.0 (its PR closes with it); upgrades are pushed to patterns/upgrade"
+  refuse "it is gone from origin" git_ -C "$work/gate-ok.git" rev-parse -q --verify refs/heads/tuteur/upgrade
   : > "$work/ci-out"
-  ran "ci upgrade: again, nothing to do" ci_ GITHUB_OUTPUT="$work/ci-out" BRANCH=tuteur/upgrade upgrade
+  ran "ci upgrade: again, nothing to do" ci_ GITHUB_OUTPUT="$work/ci-out" BRANCH=patterns/upgrade upgrade
   expect "changed=false" grep -qx changed=false "$work/ci-out"
   git_ checkout -q main && git_ submodule update -q --recursive
   stub_pr pr1
@@ -1154,9 +1169,9 @@ sec_ci() {
   expect "and what changed upstream" has "### pa v1.1.0 -> v1.2.0"
   expect "its commits (no CHANGELOG at v1.2.0)" grep -q "^> - [0-9a-f]* v1.2.0$" <<<"$out"
   # what ci pr refuses: a .gitmodules change, a workflow change; the README only when tuteur or a pattern moved
-  push_branch() { git_ push -q --force origin HEAD:refs/heads/tuteur/upgrade && git_ checkout -q main; }
+  push_branch() { git_ push -q --force origin HEAD:refs/heads/patterns/upgrade && git_ checkout -q main; }
   git_ fetch -q origin
-  git_ checkout -q -b x1 origin/tuteur/upgrade && git_ config -f .gitmodules submodule..patterns/pa.url "file://$work/elsewhere.git" && commit swap && push_branch
+  git_ checkout -q -b x1 origin/patterns/upgrade && git_ config -f .gitmodules submodule..patterns/pa.url "file://$work/elsewhere.git" && commit swap && push_branch
   stub_pr pr2
   expect "ci pr: a .gitmodules change: refused" grep -qx 1 "$work/pr2.rc"
   expect "says so" grep -q "changes files tuteur upgrade never writes: .gitmodules" "$work/pr2.out"
@@ -1174,10 +1189,14 @@ sec_ci() {
 
   # a check the upgrade breaks: the branch is still pushed, the step fails, the PR says why
   gate gate-bad v1.1.0
-  git_ checkout -q -b tuteur/upgrade
-  refused "ci upgrade: fails when the repo's own check fails" ci_ GITHUB_OUTPUT="$work/bad-out" BRANCH=tuteur/upgrade upgrade
+  # a tuteur/upgrade with someone's own commit on it: left, with a warning
+  git_ commit -q --allow-empty -m "my fix" && git_ push -q origin HEAD:refs/heads/tuteur/upgrade && git_ reset -q --hard HEAD~1
+  git_ checkout -q -b patterns/upgrade
+  refused "ci upgrade: fails when the repo's own check fails" ci_ GITHUB_OUTPUT="$work/bad-out" BRANCH=patterns/upgrade upgrade
   expect "but says it changed" grep -qx changed=true "$work/bad-out"
-  body=$(git_ -C "$work/gate-bad.git" log -1 --format=%b tuteur/upgrade)
+  expect "leaves a tuteur/upgrade that has someone's commit" git_ -C "$work/gate-bad.git" rev-parse -q --verify refs/heads/tuteur/upgrade
+  expect "and warns" holds "::warning::tuteur/upgrade, the branch tuteur's upgrade job pushed before 0.3.0, has a commit that isn't the job's"
+  body=$(git_ -C "$work/gate-bad.git" log -1 --format=%b patterns/upgrade)
   expect "its commit names the failing check" grep -qx "nix flake check failed: pa-version" <<<"$body"
   expect "with its log's tail (the new version, seen)" grep -q "pa-version: expected v1.1.0, got v1.2.0" <<<"$body"
   expect "and still the move" grep -qx "tuteur: pa v1.1.0 -> v1.2.0" <<<"$body"
@@ -1466,7 +1485,7 @@ EOF
   expect "holds the repo kit, with its file" holds '"self":{"file":"flake.nix (perSystem)","protect":["AGENTS.md"],"tools":["/nix/store/'
   expect "and the pattern kit, handed through unread" holds '"kk":{"commands":{"kk-tool":{"program":"/nix/store/'
   expect "naming its provider file" holds '"file":".patterns/kk/tuteur.nix"'
-  expect "pot protects every provider file, by either name, and the patterns folder" holds '"protect":["**/pattern.nix","**/tuteur.nix","**/graft.nix",".patterns"]'
+  expect "pot protects every provider file, by either name, and the patterns folder" holds '"protect":["**/pattern.nix","**/tuteur.nix",".patterns"]'
   expect "its tools hold the repository's tuteur" test -x "$work/kpk/bin/tuteur"
   expect "and the repo kit's tools" test -x "$work/kpk/bin/hello"
   ran "kits: kitArgs reaches the provider" "$(jq -r '.scions.kk.commands["kk-tool"].program' "$work/kpk/kit.json")"
@@ -1505,19 +1524,16 @@ EOF
   # the errors and reserved names, as a consumer's build shows them
   refused "kits: mkFlake writes no graft-kits" nix eval --raw ".#packages.$sys.graft-kits.drvPath"
   by_hand kkold && commit kkold
-  refused "kits: a provider's sandbox" nix build --no-link .#pot-kits
-  expect "names kit" holds "tuteur: .patterns/kkold/tuteur.nix gives \`sandbox\`: graft v2.15.0 replaced it with \`kit\`"
+  ran "kits: a provider's sandbox (graft v2.14.0's) is read no more" nix build --no-link .#pot-kits
   git_ rm -q .patterns/kkold && by_hand kkapp && commit kkapp
   refused "kits: a provider's apps.pot" nix build --no-link .#tools
   expect "is reserved" holds "tuteur: apps pot (from kkapp): that name is tuteur's; the provider must rename it"
   git_ rm -q .patterns/kkapp && commit "no kkapp"
-  local n
-  for n in pot-kits graft-kits; do
-    sed -i "s|perSystem = { pkgs, ... }: {|perSystem = { pkgs, ... }: { packages.$n = pkgs.hello;|" flake.nix && commit "own $n"
-    refused "kits: perSystem's packages.$n" nix build --no-link .#tools
-    expect "is tuteur's" holds "tuteur: packages $n (from self): that name is tuteur's; rename the repo's own"
-    sed -i "s|{ packages.$n = pkgs.hello;|{|" flake.nix && commit "no own $n"
-  done
+  local n=pot-kits
+  sed -i "s|perSystem = { pkgs, ... }: {|perSystem = { pkgs, ... }: { packages.$n = pkgs.hello;|" flake.nix && commit "own $n"
+  refused "kits: perSystem's packages.$n" nix build --no-link .#tools
+  expect "is tuteur's" holds "tuteur: packages $n (from self): that name is tuteur's; rename the repo's own"
+  sed -i "s|{ packages.$n = pkgs.hello;|{|" flake.nix && commit "no own $n"
   refuse "kits: mkFlake reads no kit field" bash -c "cat '$tuteur/lib/mk-flake.nix' | grep -qE 'kit\.(packages|requests|commands|protect|files|env|recipes)|selfKit'"
 
   # no inputs.pot: no pot-kits, the tools unwrapped, no kits.just, and one warning naming the kits
@@ -1569,90 +1585,117 @@ EOF
   cd "$work"
 }
 
-# aliases: graft's names, which tuteur 0.2.x reads (and 0.3.0 drops): the input name graft (read through 0.x), the
-# app graft, scions/ as the folder when mkFlake has no dir, graft's marker README, graft.nix and its arguments scion
-# and scions, marked graft-*.yaml workflows and the "# graft ssh:" line (sync renames and rewrites them),
-# .graft-try and --scions. tuteur check names each one in use, in one line that never fails it.
-sec_aliases() {
-  # ol: a provider with graft.nix only, whose function names scion and scions and has no `...`
+# graftnames: graft's names, which tuteur 0.2.x read and 0.3.0 no longer does: each one a consumer could still have
+# is an error naming the way on, or is ignored where nothing breaks. What 0.3.0 still reads: the input name graft
+# (through 0.x), a provider's tuteur.nix (through 0.x, after pattern.nix), and GRAFT_SSH_KEY after TUTEUR_SSH_KEY.
+# (graft's marker README: the mkflake and check sections.)
+sec_graftnames() {
+  # ol: a provider with graft.nix only, whose function names scion and scions
   prov ol
   cat > "$work/src/ol/graft.nix" <<'EOF'
 { pkgs, lib, system, scion, scions, consumer }:
 { tools.ol = pkgs.writeShellScriptBin "ol" "cat ${scion}/README.md ${scions.docs}/policy.md"; }
 EOF
   release ol v1.0.0
-  local c=$work/al && consumer "$c" "$(printf '  inputs.self.submodules = true;\n  inputs.graft.url = "path:%s";\n  outputs = inputs: inputs.graft.lib.mkFlake { inherit inputs; };' "$tuteur")"
+  # v1.1.0: pattern.nix, still naming scion and scions; v1.2.0: tuteur.nix, naming pattern and patterns
+  git_ -C "$work/src/ol" mv graft.nix pattern.nix && release ol v1.1.0
+  git_ -C "$work/src/ol" mv pattern.nix tuteur.nix
+  # shellcheck disable=SC2016 # Nix's own interpolation
+  sed -i 's/scion, scions, consumer }/pattern, patterns, consumer }/; s/\${scion}/${pattern}/; s/\${scions.docs}/${patterns.docs}/' "$work/src/ol/tuteur.nix"
+  release ol v1.2.0
+  local c=$work/gn && consumer "$c" "$(printf '  inputs.self.submodules = true;\n  inputs.graft.url = "path:%s";\n  outputs = inputs: inputs.graft.lib.mkFlake { inherit inputs; };' "$tuteur")"
   cd "$c"
+  # scions/, as tuteur 0.2.x's sync left it: tuteur's marker README
   by_hand docs v1.0.0 scions && by_hand ol v1.0.0 scions
-  sed -i 's|<!-- managed by tuteur: https://github.com/danielnaab/tuteur -->|<!-- managed by graft: https://github.com/danielnaab/graft -->|' scions/README.md
-  mkdir -p .forgejo/workflows
-  local key='ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl'
-  sed 's/tuteur/graft/g; s/Patterns/Scions/g; s/patterns/scions/g' "$tuteur/template/.forgejo/workflows/tuteur-check.yaml" \
-    | awk -v l="# graft ssh: host=[git.example.com]:2222 hostkey=$key" 'NR == 2 { print l } { print }' > .forgejo/workflows/graft-check.yaml
   commit init && quiet nix flake lock && commit lock
 
-  ran "aliases: the tools build: scions/ found by graft's default, graft.nix, its scion and scions" tools_out ol
-  expect "the provider read its pattern, by scion" has "# ol"
-  expect "and a sibling, by scions" has "policy v1"
-  ran "aliases: check, through the app graft" nix run .#graft -- check
-  expect "passes" has "tuteur: 2 patterns clean and at release tags"
-  expect "names the app" holds "tuteur: the app graft (nix run .#graft) is graft's name; 0.3.0 drops it: run nix run .#tuteur"
-  expect "names the marker" holds "tuteur: the marker in scions/README.md is graft's name; 0.3.0 drops it: tuteur sync rewrites it"
-  expect "names the workflow" holds "tuteur: .forgejo/workflows/graft-check.yaml is graft's name; 0.3.0 drops it: tuteur sync renames it to .forgejo/workflows/tuteur-check.yaml"
-  expect "names the folder" holds "tuteur: the folder scions/, which mkFlake finds without dir, is graft's name; 0.3.0 drops it: keep it with dir = \"scions\"; in mkFlake, or move it to .patterns/ (0.3.0's Upgrading steps)"
-  expect "names the provider file" holds "tuteur: scions/ol/graft.nix is graft's name; 0.3.0 drops it: the provider ships pattern.nix"
-  expect "names the arguments" holds "tuteur: each of scion and scions, in scions/ol/graft.nix's arguments, is graft's name; 0.3.0 drops it: name them pattern and patterns"
-  refuse "and not the input name graft (read through 0.x)" holds "input"
-  ran "aliases: outdated reads tuteur's own input by graft's name" nix run .#tuteur -- outdated
-  expect "a row named graft" grep -qE "^graft +- +path +- +untagged" <<<"$out"
-
-  ran "aliases: sync" nix run .#tuteur sync
-  expect "rewrites the marker" grep -qxF "<!-- managed by tuteur: https://github.com/danielnaab/tuteur -->" scions/README.md
-  expect "renames the workflow" has "tuteur: renamed .forgejo/workflows/graft-check.yaml to .forgejo/workflows/tuteur-check.yaml"
-  expect "the old name is gone" test ! -e .forgejo/workflows/graft-check.yaml
-  expect "the new marker" grep -q "^# managed by tuteur: " .forgejo/workflows/tuteur-check.yaml
-  expect "the ssh line in tuteur's form" grep -qxF "# tuteur ssh: host=[git.example.com]:2222 hostkey=$key" .forgejo/workflows/tuteur-check.yaml
-  # shellcheck disable=SC2016 # the workflow's own expression
-  expect "its secret: TUTEUR_SSH_KEY, else GRAFT_SSH_KEY" grep -qF 'TUTEUR_SSH_KEY: ${{ secrets.TUTEUR_SSH_KEY || secrets.GRAFT_SSH_KEY }}' .forgejo/workflows/tuteur-check.yaml
-  commit sync
-  ran "aliases: check after sync" nix run .#tuteur -- check
-  refuse "no line for the marker" holds "the marker in"
-  refuse "or the workflow" holds "graft-check.yaml"
-  refuse "or the app (run as tuteur)" holds "the app graft"
-  expect "the folder still" holds "tuteur: the folder scions/"
-  # an explicit dir keeps scions/: no line for the folder
+  refused "graftnames: scions/ is no default folder" nix build --no-link .#tools
+  expect "says to set dir, or move it" holds "tuteur: tuteur's README is in scions/ but mkFlake's dir is \".patterns\": set dir = \"scions\"; (or move the patterns)"
+  refused "graftnames: check fails on it" nix run .#tuteur -- check
+  expect "naming dir" holds "tuteur: tuteur's README is in scions/ but mkFlake's dir is \".patterns\": set dir = \"scions\"; in flake.nix (or move the patterns)"
+  refused "graftnames: no app graft" nix run .#graft -- check
   sed -i 's|mkFlake { inherit inputs; }|mkFlake { inherit inputs; dir = "scions"; }|' flake.nix && commit "dir = scions"
-  ran "aliases: check, dir = \"scions\"" nix run .#tuteur -- check
-  refuse "no line for the folder" holds "the folder scions/"
 
-  # .graft-try: check fails on it, and try --stop removes it
+  # graft.nix alone: not read; check fails, naming it
+  ran "graftnames: the tools build, without graft.nix's" nix build -o "$work/result" .#tools
+  expect "no tool ol" test ! -e "$work/result/bin/ol"
+  refused "graftnames: check, a provider with graft.nix only" nix run .#tuteur -- check
+  expect "names it" holds "tuteur: scions/ol/graft.nix is graft v2's provider file, which tuteur 0.3.0 no longer reads (it reads pattern.nix, then tuteur.nix): take a release of ol that ships pattern.nix (ask its maintainers), or stay on tuteur 0.2.x until there is one"
+  refuse "and no line saying graft's name is still read" holds "0.3.0 drops it"
+  # scion and scions: an error naming pattern and patterns
+  ran "graftnames: upgrade ol (pattern.nix, naming scion and scions)" nix run .#tuteur -- upgrade ol@v1.1.0
+  commit "ol v1.1.0"
+  refused "graftnames: the tools, a provider naming scion and scions" nix build --no-link .#tools
+  expect "names them" holds "tuteur: scions/ol/pattern.nix names scion and scions, graft's arguments (provider/2), which tuteur 0.3.0 no longer gives: name them pattern and patterns (provider/3)"
+  # tuteur.nix (read through 0.x), with pattern and patterns
+  ran "graftnames: upgrade ol (tuteur.nix)" nix run .#tuteur -- upgrade ol@v1.2.0
+  commit "ol v1.2.0"
+  ran "graftnames: a provider's tuteur.nix is read (through 0.x)" tools_out ol
+  expect "the provider read its pattern" has "# ol"
+  expect "and a sibling" has "policy v1"
+  ran "graftnames: check passes" nix run .#tuteur -- check
+  expect "says so" has "tuteur: 2 patterns clean and at release tags"
+  ran "graftnames: outdated reads tuteur's own input by graft's name (through 0.x)" nix run .#tuteur -- outdated
+  expect "a row named graft" grep -qE "^graft +- +path +- +untagged" <<<"$out"
+  # the consumer's perSystem naming scions
+  sed -i 's|dir = "scions"; }|dir = "scions"; perSystem = { scions, ... }: { }; }|' flake.nix && commit "perSystem scions"
+  refused "graftnames: perSystem naming scions" nix build --no-link .#tools
+  expect "names it" holds "tuteur: the consumer's perSystem names scions, graft's arguments (provider/2), which tuteur 0.3.0 no longer gives: name it patterns (provider/3)"
+  sed -i 's| perSystem = { scions, ... }: { };||' flake.nix && commit "no perSystem"
+
+  # graft's marked workflow: not renamed; check fails, naming it
+  mkdir -p .forgejo/workflows
+  sed 's/^# managed by tuteur: .*$/# managed by graft: https:\/\/github.com\/danielnaab\/graft/; s/tuteur-check/graft-check/g' \
+    "$tuteur/template/.forgejo/workflows/tuteur-check.yaml" > .forgejo/workflows/graft-check.yaml
+  commit "graft's workflow"
+  ran "graftnames: sync leaves graft's workflow" nix run .#tuteur sync
+  refuse "no rename" holds "renamed"
+  expect "it is still there" test -f .forgejo/workflows/graft-check.yaml
+  refused "graftnames: check, graft's marked workflow" nix run .#tuteur -- check
+  expect "names it" holds "tuteur: .forgejo/workflows/graft-check.yaml is graft v2's workflow, which runs nix run .#graft, an app tuteur 0.3.0 doesn't give: copy tuteur's tuteur-check.yaml (template/.forgejo/workflows/) into .forgejo/workflows/ in its place, then tuteur sync"
+  git_ rm -q .forgejo/workflows/graft-check.yaml
+  # "# graft ssh:" is not read: tuteur's workflow with it is a hand edit
+  mkdir -p .forgejo/workflows && cp "$tuteur/template/.forgejo/workflows/tuteur-check.yaml" .forgejo/workflows/
+  local key='ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl'
+  sed -i "1a # graft ssh: host=[git.example.com]:2222 hostkey=$key" .forgejo/workflows/tuteur-check.yaml && commit "graft ssh"
+  refused "graftnames: check, a \"# graft ssh:\" line" nix run .#tuteur -- check
+  expect "is an edit, not tuteur's line" holds "tuteur: .forgejo/workflows/tuteur-check.yaml differs from the copy this tuteur version ships"
+  # shellcheck disable=SC2016 # the workflow's own expression
+  sed -i 's/^# graft ssh:/# tuteur ssh:/' .forgejo/workflows/tuteur-check.yaml && quiet nix run .#tuteur sync && commit "tuteur ssh"
+  # shellcheck disable=SC2016 # the workflow's own expression
+  expect "graftnames: the ssh step's secret: TUTEUR_SSH_KEY, else GRAFT_SSH_KEY (still read)" grep -qF 'TUTEUR_SSH_KEY: ${{ secrets.TUTEUR_SSH_KEY || secrets.GRAFT_SSH_KEY }}' .forgejo/workflows/tuteur-check.yaml
+  expect "graftnames: the PR token: TUTEUR_PR_TOKEN, else GRAFT_PR_TOKEN (still read)" grep -qF 'secrets.TUTEUR_PR_TOKEN || secrets.GRAFT_PR_TOKEN' "$tuteur/template/.forgejo/workflows/tuteur-upgrade.yaml"
+  ran "graftnames: check passes" nix run .#tuteur -- check
+
+  # .graft-try: not tuteur's marker; try --stop leaves it
   echo x > .graft-try && git_ add -N .graft-try
-  refused "aliases: check, graft try's marker" nix run .#tuteur -- check
-  expect "names it" holds "tuteur: .graft-try is graft try's marker: tuteur try --stop removes it"
-  ran "aliases: try --stop" nix run .#tuteur -- try --stop
-  expect "removes it" test ! -e .graft-try
-  expect "says so" has "tuteur: removed .graft-try, graft try's marker"
+  ran "graftnames: check, .graft-try" nix run .#tuteur -- check
+  refuse "says nothing of it" holds ".graft-try"
+  ran "graftnames: try --stop" nix run .#tuteur -- try --stop
+  expect "leaves it" test -e .graft-try
+  git_ rm -q --cached .graft-try && rm -f .graft-try
   # add --scions
   prov alq && release alq v1.0.0
-  ran "aliases: add --scions" nix run .#tuteur -- add --scions scions "$(url alq)"
-  expect "names it" holds "tuteur: --scions is graft's name; 0.3.0 drops it: use --dir"
-  expect "and adds" test -f scions/alq/README.md
+  refused "graftnames: add --scions" nix run .#tuteur -- add --scions scions "$(url alq)"
+  expect "is an unknown option" holds "tuteur: unknown option --scions"
   cd "$work"
 }
 
-# fromgraft: a consumer of graft v2.22.0 moved to tuteur 0.1.0 by the consumer's pull request in
-# docs/guides/move-from-graft.md, checked, then rolled back with git revert. graft v2.22.0 is this repository's own
-# history (GRAFT_V2_22), as a local repository tagged v2.22.0; tuteur 0.1.0 is this tree, tagged v0.1.0; pot is
-# dev/flake.nix's.
+# fromgraft: a consumer of graft v2.22.0 moved to tuteur 0.2.1 by the consumer's pull request in
+# docs/guides/move-from-graft.md, checked, rolled back with git revert and moved again; then to this tree, tagged
+# v0.3.0, by v0.3.0's Upgrading steps in CHANGELOG.md. graft v2.22.0 (GRAFT_V2_22) and tuteur v0.2.1 (TUTEUR_V0_2_1)
+# are this repository's own history, in a local repository with their tags; pot is dev/flake.nix's.
 GRAFT_V2_22=98552bd17459071d2df4c192984114fce270d9c7
+TUTEUR_V0_2_1=be8b8c7600e041758078441926e8f3f34bae07c7
 sec_fromgraft() {
   git_ -C "$src" cat-file -e "$GRAFT_V2_22^{commit}" 2>/dev/null || fail "fromgraft: graft v2.22.0 ($GRAFT_V2_22) is not in this clone's history"
+  git_ -C "$src" cat-file -e "$TUTEUR_V0_2_1^{commit}" 2>/dev/null || fail "fromgraft: tuteur v0.2.1 ($TUTEUR_V0_2_1) is not in this clone's history"
   local pot gv tv c=$work/fg before
   pot=$(pot_src) || fail "fromgraft: dev/flake.nix has no pot input"
   gv=$work/graft-v2 && mkdir -p "$gv" && git_ -C "$src" archive "$GRAFT_V2_22" | tar -x -C "$gv"
   git_ -C "$gv" init -q && git_ -C "$gv" add -A && git_ -C "$gv" commit -qm v2.22.0 && git_ -C "$gv" tag v2.22.0
-  tv=$work/tuteur-v0 && mkdir -p "$tv" && cp -R "$tuteur/." "$tv/" && rm -rf "$tv/.patterns"
-  git_ -C "$tv" init -q && git_ -C "$tv" add -A && git_ -C "$tv" commit -qm v0.1.0 && git_ -C "$tv" tag v0.1.0
+  tv=$work/tuteur-v0 && mkdir -p "$tv" && git_ -C "$src" archive "$TUTEUR_V0_2_1" | tar -x -C "$tv"
+  git_ -C "$tv" init -q && git_ -C "$tv" add -A && git_ -C "$tv" commit -qm v0.2.1 && git_ -C "$tv" tag v0.2.1
   # fk: a provider whose graft.nix gives a tool, and a kit with a command and a recipe
   prov fk
   cat > "$work/src/fk/graft.nix" <<'EOF'
@@ -1672,12 +1715,16 @@ EOF
   ran "fromgraft: graft check passes" nix run .#graft check
   cp flake.nix "$work/fg-flake.nix" && cp flake.lock "$work/fg-flake.lock" && before=$(git_ rev-parse HEAD)
 
+  # tuteur 0.3.0 itself refuses graft's README, naming the way on
+  refused "fromgraft: tuteur 0.3.0 on graft's consumer" G check -C .
+  expect "says to move with tuteur 0.2.x first" holds "tuteur: scions/README.md carries graft's marker (graft v2): tuteur 0.3.0 no longer reads graft's names: move with tuteur 0.2.x first"
+
   # step 1: flake.nix's URLs (the input keeps the name graft), and pot, which this consumer's kits need; then lock
-  sed -i "s|  inputs.graft.url = \"git+file://$gv?ref=v2.22.0\";|  inputs.graft.url = \"git+file://$tv?ref=v0.1.0\";\n  inputs.pot.url = \"path:$pot\";|" flake.nix
+  sed -i "s|  inputs.graft.url = \"git+file://$gv?ref=v2.22.0\";|  inputs.graft.url = \"git+file://$tv?ref=v0.2.1\";\n  inputs.pot.url = \"path:$pot\";|" flake.nix
   ran "fromgraft: step 1, lock" env XDG_CACHE_HOME="$work/xdg-fg" nix flake update graft
-  # shellcheck disable=SC2016 # a just recipe's own text
-  expect "graft's input is tuteur 0.1.0" quiet jq -e --arg r "$(git_ -C "$tv" rev-parse v0.1.0)" '.nodes.graft.locked.rev == $r' flake.lock
-  # step 2: sync, by graft's name for the app: tuteur 0.1.0, through the alias
+  # shellcheck disable=SC2016 # jq's $r
+  expect "graft's input is tuteur 0.2.1" quiet jq -e --arg r "$(git_ -C "$tv" rev-parse v0.2.1)" '.nodes.graft.locked.rev == $r' flake.lock
+  # step 2: sync, by graft's name for the app: tuteur 0.2.1, through the alias
   ran "fromgraft: step 2, nix run .#graft sync" nix run .#graft sync
   expect "rewrites the marker README" grep -qxF "<!-- managed by tuteur: https://github.com/danielnaab/tuteur -->" scions/README.md
   expect "renames graft's workflows" has "tuteur: renamed .forgejo/workflows/graft-check.yaml to .forgejo/workflows/tuteur-check.yaml"
@@ -1703,6 +1750,39 @@ EOF
   ran "fromgraft: graft check passes again" nix run .#graft check
   expect "graft's own message" has "graft: 1 scion clean and at release tags"
   ran "fromgraft: and nix flake check" nix flake check
+  ran "fromgraft: moved again (revert the revert)" git_ revert --no-edit HEAD
+  git_ submodule update -q --init --recursive
+
+  # then tuteur 0.3.0 (this tree), by v0.3.0's Upgrading steps. fk v1.1.0 ships pattern.nix in place of graft.nix
+  git_ -C "$tv" rm -rq . && cp -R "$tuteur/." "$tv/" && rm -rf "$tv/.patterns"
+  git_ -C "$tv" add -A && git_ -C "$tv" commit -qm v0.3.0 && git_ -C "$tv" tag v0.3.0
+  git_ -C "$work/src/fk" mv graft.nix pattern.nix && release fk v1.1.0
+  # step 1: on tuteur 0.2.1, check's lines: a provider's graft.nix, so a release of the provider with pattern.nix
+  ran "fromgraft: 0.3.0 step 1, upgrade fk on tuteur 0.2.1" nix run .#tuteur -- upgrade fk
+  commit "fk v1.1.0"
+  ran "fromgraft: check names only the folder" nix run .#tuteur check
+  refuse "no provider file" holds "graft.nix"
+  # step 2: take 0.3.0 by name (the input keeps graft's name): 0.2.1's upgrade runs 0.3.0's lib/refresh.sh
+  ran "fromgraft: 0.3.0 step 2, upgrade graft@v0.3.0" env XDG_CACHE_HOME="$work/xdg-fg3" nix run .#tuteur -- upgrade graft@v0.3.0
+  expect "moves the input" has "tuteur: graft v0.2.1 -> v0.3.0"
+  expect "writes 0.3.0's workflows: the branch patterns/upgrade" grep -qx '  BRANCH: patterns/upgrade' .forgejo/workflows/tuteur-upgrade.yaml
+  commit "tuteur v0.3.0"
+  refused "fromgraft: check, scions/ with no dir" nix run .#tuteur check
+  expect "names dir" holds "tuteur: tuteur's README is in scions/ but mkFlake's dir is \".patterns\""
+  # step 3: move the folder (git mv moves the submodule, and its path in .gitmodules), then sync
+  ran "fromgraft: 0.3.0 step 3, git mv scions .patterns" git_ mv scions .patterns
+  expect ".gitmodules follows" grep -qxF $'\tpath = .patterns/fk' .gitmodules
+  sed -i 's|"scions/kits.just"|".patterns/kits.just"|' justfile
+  ran "fromgraft: 0.3.0 step 3, sync" nix run .#tuteur sync
+  commit "Patterns in .patterns/"
+  ran "fromgraft: 0.3.0 step 4, check" nix run .#tuteur check
+  expect "passes" has "tuteur: 1 pattern clean and at release tags"
+  refuse "with no line for graft's names" holds "graft's name"
+  ran "fromgraft: outdated" nix run .#tuteur -- outdated
+  expect "graft (the input's name) at v0.3.0" grep -qE "^graft +- +v0\.3\.0 +v0\.3\.0 +current" <<<"$out"
+  ran "fromgraft: and nix flake check" nix flake check
+  ran "fromgraft: and ci check" ci_ check
+  expect "passes" holds "tuteur: ci check passed"
   cd "$work"
 }
 
@@ -1732,7 +1812,7 @@ sec_own() {
   expect "own: and a comment in lib/common.sh changes it (the experiment sees tuteur's sources)" test "$b0" != "$b1"
 }
 
-sections=(own contracts mkflake tarball nix try kits add sync check outdated status changelog upgrade tuteur workflows ci migrate aliases fromgraft)
+sections=(own contracts mkflake tarball nix try kits add sync check outdated status changelog upgrade tuteur workflows ci migrate graftnames fromgraft)
 [ $# -eq 0 ] || sections=("$@")
 for s in "${sections[@]}"; do
   echo "== $s"

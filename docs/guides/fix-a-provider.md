@@ -86,7 +86,7 @@ release tag.
    try off first (step 4).
 
    When `nix run .#tuteur` itself fails (the fix broke `pattern.nix`, or Nix cannot fetch a pattern's gitlink),
-   run tuteur from its own flake: `nix run github:danielnaab/tuteur/v0.2.1 -- try -C .`.
+   run tuteur from its own flake: `nix run github:danielnaab/tuteur/v0.3.0 -- try -C .`.
 
    For a flake in a subdirectory, `try` changes nothing and prints `nix shell 'path:DIR#tools' -c TOOL`: a
    `path:` flake reads its working tree, new files included, on every build. Never build `path:.` at a
@@ -184,7 +184,7 @@ Nix fetches a commit that is on any branch of the provider, so builds work. `tut
 pull request cannot pass tuteur-check until the pattern is at a release: step 8's
 `nix run .#tuteur upgrade knowledge-base-kit@v2.2.1` moves it there. Until the commit is pushed, Nix cannot
 fetch it, so `nix run .#tuteur` itself cannot evaluate on a clean tree; run
-`nix run github:danielnaab/tuteur/v0.2.1 -- check -C .` instead. With
+`nix run github:danielnaab/tuteur/v0.3.0 -- check -C .` instead. With
 `push.recurseSubmodules=check` ([Clones, worktrees, sandboxes and CI](clones-and-worktrees.md)), git refuses
 to push the consumer while the pattern's commit is on no remote.
 
@@ -203,7 +203,7 @@ to push the consumer while the pattern's commit is on no remote.
 - **`Cannot find Git revision '<sha>' in ref 'refs/heads/main' of repository '<url>'`.** The consumer records
   a pattern commit that the provider does not have: you committed the gitlink before pushing the pattern's
   branch. `nix run .#tuteur` fails the same way, before tuteur runs; use tuteur's own flake meanwhile
-  (`nix run github:danielnaab/tuteur/v0.2.1 -- try -C .`, or `-- check -C .`). Push the branch (step 5), or
+  (`nix run github:danielnaab/tuteur/v0.3.0 -- try -C .`, or `-- check -C .`). Push the branch (step 5), or
   record the release again: `git -C .patterns/NAME checkout --detach v2.2.0` (the tag it was at), then
   `git add .patterns/NAME` and commit. Step 7 does not help here: it checks out the recorded commit.
 - **`tuteur upgrade` refuses: the pattern has uncommitted edits, or try is on.** Do step 7 first. Commit or stash

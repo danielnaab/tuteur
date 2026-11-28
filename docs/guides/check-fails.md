@@ -70,8 +70,25 @@ commit `.patterns/README.md`.
 ### tuteur: tuteur's README is in .patterns/ but mkFlake's dir is "DIR": set dir = ".patterns"; …
 
 `mkFlake`'s `dir` in `flake.nix` names another folder than the one holding your patterns, so Nix would build
-without them. Set `dir` to the folder the message names (or leave `dir` out for `patterns`), and commit. mkFlake
+without them. Set `dir` to the folder the message names (or leave `dir` out for `.patterns`), and commit. mkFlake
 gives the same message when Nix evaluates the tools.
+
+After tuteur 0.3.0, `scions/` or `.scions/` (graft's folder) gives this message too: 0.2.x found it without `dir`.
+Keep it with `dir = "scions";`, or move it: `git mv scions .patterns`, then `nix run .#tuteur sync`
+([CHANGELOG, v0.3.0](../../CHANGELOG.md#v030---2026-11-27), Upgrading).
+
+### tuteur: .patterns/NAME/graft.nix is graft v2's provider file, which tuteur 0.3.0 no longer reads …
+
+The provider ships only graft's file name, which tuteur read through 0.2.x, so its tools, checks and kit are
+missing from the flake. Take a release of the provider that ships `pattern.nix` (`nix run .#tuteur upgrade NAME`,
+or `NAME@TAG`); if there is none yet, ask its maintainers, and stay on tuteur 0.2.x until there is.
+
+### tuteur: .forgejo/workflows/graft-NAME.yaml is graft v2's workflow, which runs nix run .#graft, …
+
+A workflow of graft's, with graft's marker line, which tuteur 0.2.x's `sync` would have renamed: it runs
+`nix run .#graft`, an app tuteur 0.3.0 does not give, so it fails in CI. Copy tuteur's
+`template/.forgejo/workflows/tuteur-NAME.yaml` into `.forgejo/workflows/`, delete the graft one, run
+`nix run .#tuteur sync`, and edit any branch rule that requires `graft-check / …`.
 
 ### tuteur: .patterns/x is tracked as files, not as a submodule: …
 
@@ -93,7 +110,7 @@ provider afresh at the version you want, with the URL that `.gitmodules` gives:
 ```
 git config -f .gitmodules submodule.patterns/x.url
 git rm -r -q --cached .patterns/x && rm -rf .patterns/x
-nix run github:danielnaab/tuteur/v0.2.1 -- add -C . URL@TAG x
+nix run github:danielnaab/tuteur/v0.3.0 -- add -C . URL@TAG x
 git ls-files -s .patterns/x     # one line, mode 160000
 ```
 
@@ -101,8 +118,8 @@ Then commit. `tuteur add` refuses to add over such a path until it leaves the in
 
 ### tuteur: .patterns/foo is not a submodule: tuteur add URL, or remove it
 
-A folder in the patterns folder is not a submodule: files committed there by hand, or a copy-mode pattern left
-over from v2.12.0. If it is a provider, `git rm -r .patterns/foo`, then `nix run .#tuteur add URL`. If it is not,
+A folder in the patterns folder is not a submodule: files committed there by hand, or a copied pattern left
+over from graft v2.12.0. If it is a provider, `git rm -r .patterns/foo`, then `nix run .#tuteur add URL`. If it is not,
 move it out of the patterns folder.
 
 ### tuteur: .patterns/x is a submodule .gitmodules doesn't register: …
@@ -203,7 +220,7 @@ deleted upstream. `nearest` is `git describe` of the commit.
 
 If the pattern's commit was never pushed to the provider, `nix run .#tuteur` cannot even evaluate (Nix fails with
 `Cannot find Git revision …`, below). Run tuteur from its own flake instead:
-`nix run github:danielnaab/tuteur/v0.2.1 -- check -C .`.
+`nix run github:danielnaab/tuteur/v0.3.0 -- check -C .`.
 
 If a line before it says `(upstream unreadable: checked local tags)`, tuteur could not reach the provider, and
 compared with the pattern's local tags. Fix the access, and run the check again. Inside a `pot` run, the line is
@@ -236,9 +253,9 @@ of the message. Commit it.
 
 The provider's `pattern.nix` does not parse (the lines above show Nix's error). Nix cannot contain a parse
 error, so every output of the flake fails, `nix run .#tuteur` too: `check` prints this only when run from
-tuteur's own flake, `nix run github:danielnaab/tuteur/v0.2.1 -- check -C .`. Move the pattern back to a release
+tuteur's own flake, `nix run github:danielnaab/tuteur/v0.3.0 -- check -C .`. Move the pattern back to a release
 that parses: `git submodule update --recursive -- .patterns/NAME` (back to the recorded pin, if you edited it),
-or `nix run github:danielnaab/tuteur/v0.2.1 -- upgrade -C . NAME@TAG` (an earlier release). Tell the
+or `nix run github:danielnaab/tuteur/v0.3.0 -- upgrade -C . NAME@TAG` (an earlier release). Tell the
 provider.
 
 ### tuteur: the flake's tools or checks don't evaluate (above): a provider's pattern.nix fails
@@ -264,8 +281,7 @@ it (`tuteur: refreshed .forgejo/workflows/FILE`). To keep your edits instead, de
 ### tuteur: two patterns folders: A, B; tuteur supports one per repository
 
 Two `README.md` files carry tuteur's marker line. tuteur finds the patterns folder and the flake by it. Keep
-the one beside your flake, and delete the other README (or its folder, if it is a left-over copy-mode
-patterns folder).
+the one beside your flake, and delete the other README.
 
 ### tuteur: note: .patterns/NAME has its own submodules (…)
 
@@ -295,7 +311,7 @@ Nix then fetches the patterns itself ([Nix behaviours](../reference/nix-behaviou
 
 Nix's own message: the consumer records a pattern commit that the provider's remote does not have. On a
 clean tree `nix run .#tuteur …` fetches every pattern before tuteur runs, so it fails here too: run tuteur from
-its own flake, `nix run github:danielnaab/tuteur/v0.2.1 -- check -C .`. The same happens to `tuteur add` of a
+its own flake, `nix run github:danielnaab/tuteur/v0.3.0 -- check -C .`. The same happens to `tuteur add` of a
 provider whose own pinned submodules are not pushed yet (before the provider's release is pushed): push
 first. Push the pattern's commit to the provider (any branch or tag), or go back to a release:
 `git submodule update --recursive -- .patterns/NAME`, then `git add .patterns/NAME`. `push.recurseSubmodules=check` prevents
@@ -314,11 +330,17 @@ filled; or the flake was fetched as `github:`, which has no submodules (use `git
 fails a provider that needs the empty pattern: `tuteur: .patterns/NAME is empty in the flake's source: …`. Run either command from the
 repository's top; `git submodule update --init --recursive` always works ([Clones, worktrees, sandboxes and CI](clones-and-worktrees.md)).
 
-### tuteur: DIR/README.md is graft's copy-mode README (v2.12 or earlier): …
+### tuteur: DIR/README.md carries graft's marker (graft v2): tuteur 0.3.0 no longer reads graft's names: …
 
-Every command and mkFlake say this. The repository is still in graft v2.12's copy mode.
-The message ends `… follow the Upgrading steps of v2.13.0 in graft's CHANGELOG.md (https://github.com/danielnaab/graft/blob/v2/CHANGELOG.md)`. Follow
-[Move from copy mode](https://github.com/danielnaab/graft/blob/v2.22.0/docs/guides/move-from-copy-mode.md).
+Every command and mkFlake say this. The repository is still on graft v2's names, which tuteur read through 0.2.x
+only. Move it with tuteur 0.2.1 first ([Move from graft v2](move-from-graft.md)), then take 0.3.0 by its
+Upgrading steps ([CHANGELOG, v0.3.0](../../CHANGELOG.md#v030---2026-11-27)).
+
+### tuteur: FILE names scion and scions, graft's arguments (provider/2), which tuteur 0.3.0 no longer gives: …
+
+A provider's `pattern.nix` (or your `perSystem`) names graft's arguments, which tuteur passed through 0.2.x. In
+your `perSystem`, rename them `pattern` and `patterns`. In a provider's file, take a release that does, or ask its
+maintainers ([provider/3](../reference/provider.md)).
 
 ### tuteur: DIR/NAME: a pattern's folder name must be letters, digits, . _ and - …
 

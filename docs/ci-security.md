@@ -19,7 +19,7 @@ with the repository's secrets.
 ## The two jobs
 
 1. **upgrade** runs `tuteur upgrade`, commits, and runs `nix flake check` on the commit, then pushes the branch
-   `tuteur/upgrade`. It holds the job token, and the `# tuteur ssh:` key if the repository has a private pattern.
+   `patterns/upgrade` (and deletes `tuteur/upgrade`, the branch before tuteur 0.3.0, when it wrote it). It holds the job token, and the `# tuteur ssh:` key if the repository has a private pattern.
    Protect the default branch, so that the job token cannot push to it.
 2. **pr** is checked out at the default branch. It runs the tuteur version that the default branch pins, and
    never evaluates the upgraded flake. It opens the pull request with `TUTEUR_PR_TOKEN`. Building the default
@@ -34,7 +34,7 @@ yourself ([If something goes wrong](guides/ci.md#if-something-goes-wrong)).
 
 The **pr** job writes the pull request body from data only:
 
-- It reads the two `flake.lock` files and the gitlinks of the default branch and of `tuteur/upgrade` as data.
+- It reads the two `flake.lock` files and the gitlinks of the default branch and of `patterns/upgrade` as data.
 - For each moved pattern, it fetches the provider with plain `git`, from the URL in the **default branch's**
   `.gitmodules`, and reads its `CHANGELOG.md` between the two commits. Nothing is checked out or run, and
   `TUTEUR_PR_TOKEN` is not in git's environment.

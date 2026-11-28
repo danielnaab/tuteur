@@ -15,13 +15,12 @@ unchanged (`tests/run.sh own` proves it).
 | Path | Contents |
 |---|---|
 | `flake.nix` | `lib.mkFlake`, the `tuteur` package (`packages.default`), tuteur's own app (`apps.tuteur`), the template, and the checks; and pot's old names (`lib.mkRoot`, `lib.pot`, `kits`, `apis`, `homeManagerModules.pot`), each an error that names pot's flake. It does not call `mkFlake` on itself and does not declare `inputs.self.submodules` ([below](#test)). |
-| `lib/mk-flake.nix` | `mkFlake`: discovery of patterns, `pattern.nix` (or `tuteur.nix` or `graft.nix`) calls, the merge of outputs, the evaluation errors, and the call to `inputs.pot.lib.pot.kitsFor` when the consumer has pot. It reads no kit field. |
+| `lib/mk-flake.nix` | `mkFlake`: discovery of patterns, `pattern.nix` (or `tuteur.nix`) calls, the merge of outputs, the evaluation errors, and the call to `inputs.pot.lib.pot.kitsFor` when the consumer has pot. It reads no kit field. |
 | `lib/tuteur.sh` | The command: dispatches to the scripts below. |
 | `lib/patterns.sh` | `add`, `sync`, `check`, `status`, `try`. |
 | `lib/tools.sh` | `outdated`, `changelog`, `upgrade`. |
 | `lib/common.sh` | Shared helpers: finds the marker README and the flake, reads `.gitmodules`, tags and the lock's own and `pot` inputs, and asks `pot why URL --json` inside a pot run. |
 | `lib/refresh.sh` | What `sync` writes, and what an older tuteur's `upgrade` runs of this version ([below](#the-version-crossing-interface)). |
-| `lib/assemble.sh` | A stub: it fails, with a link to graft's v2.13.0 Upgrading steps, when a graft v2.12 `upgrade` runs this version. |
 | `lib/migrate.sh`, `lib/migrate.jq` | `migrate`. |
 | `lib/ci.sh`, `lib/upstream.jq` | `ci`, and the provider text in the pull request. |
 | `lib/workflows.sh` | tuteur's workflow files. |
@@ -98,8 +97,9 @@ checkout's working tree as a `path:` input, and a tarball of it as a `tarball+fi
 mkFlake (discovery, isolation, siblings, collisions, the evaluation errors), the Nix fetch rules that tuteur
 depends on, the seam between mkFlake and pot's `kitsFor` (`kits`), `add`, `sync`, `check` (one fixture per rule),
 `outdated`, `status`, `changelog`, `upgrade` (with a `0.y` series), tuteur's own pin (`tuteur`), `migrate`, `ci`
-against a local origin and a stub API, the workflows, graft's names that 0.2.x reads (`aliases`), and a consumer of
-graft v2.22.0 moved by [Move from graft v2](guides/move-from-graft.md) (`fromgraft`). `own` checks tuteur's own
+against a local origin and a stub API, the workflows, what 0.3.0 does with graft's names that 0.2.x read
+(`graftnames`), and a consumer of graft v2.22.0 moved to tuteur v0.2.1 by [Move from graft v2](guides/move-from-graft.md),
+then to this tree by v0.3.0's Upgrading steps (`fromgraft`). `own` checks tuteur's own
 flake: no `inputs.self.submodules`, no pot in its lock, the command unchanged by an edit to mkFlake, and the docs
 check. It takes several minutes and fetches nixpkgs on its first run. Do not
 run several copies in parallel.
@@ -125,7 +125,7 @@ tuteur's own rules:
   steps (at most ten) and its own check under a heading that names it ([example](guides/incompatible-change.md)).
 - Read a new or changed guide literally, against a fixture: `tests/fixtures.sh NAME OUT` builds one
   (`first-pattern`, `check-fails`, `fix-a-provider`, `gate-merges`, `private`, `ci`, `breaking-change`,
-  `upgrade`, `publish`, `worktrees`, `copy-mode`). A
+  `upgrade`, `publish`, `worktrees`). A
   reader that sees only the page and its links follows each step and says what it expects first. Then a
   reviewer checks its claims against the code.
 

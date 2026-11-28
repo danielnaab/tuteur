@@ -169,7 +169,7 @@ It needs `jq`. A newer major version does not make it fail: that pin's status st
 - **All or nothing.** `upgrade` reads every provider's tags first, and changes nothing if one cannot be read
   or a named tag does not exist.
 - **tuteur's own pin.** Its pin moves first, then the rest of the upgrade runs the new version. Pin tuteur to a
-  tag (`github:danielnaab/tuteur/v0.2.1`): a pin to the `v2` branch is never moved.
+  tag (`github:danielnaab/tuteur/v0.3.0`): a pin to the `v2` branch is never moved.
 - **Without `upgrade`.** To move a pattern yourself:
   `git -C .patterns/NAME fetch --tags && git -C .patterns/NAME checkout --detach v1.1.0 && git add .patterns/NAME`.
 - **From outside the repository.** `outdated`, `changelog`, `upgrade` and `migrate` also run from tuteur's

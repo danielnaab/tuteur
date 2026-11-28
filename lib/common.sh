@@ -20,7 +20,7 @@
 MARKER="<!-- managed by tuteur: https://github.com/danielnaab/tuteur -->"
 # shellcheck disable=SC2034 # used by the scripts that source this file
 WORKFLOW_MARKER='# managed by tuteur: '
-# graft's markers (graft v2, before the rename), read through 0.2.x: sync rewrites them (tuteur check names them)
+# graft's marker (graft v2, before the rename): tuteur 0.3.0 reads it no more, and stops on it with the way on (locate)
 OLD_MARKER="<!-- managed by graft: https://github.com/danielnaab/graft -->"
 nix_() { nix --extra-experimental-features 'nix-command flakes' "$@"; }
 # nix_clean ARGS: nix_ through an empty fetch cache of this run's own (XDG_CACHE_HOME in TUTEUR_TMP), and without the
@@ -41,15 +41,12 @@ trap 'rm -rf "$TUTEUR_TMP"' EXIT
 
 die() { echo "tuteur: $*" >&2; exit 1; }
 
-# alias_line THING WHAT: one line, never a failure, for a name of graft's that tuteur 0.2.x still reads
-alias_line() { echo "tuteur: $1 is graft's name; 0.3.0 drops it: $2" >&2; }
+# FROM_GRAFT: where a repository still on graft's names goes first: tuteur 0.2.x read them, and its sync rewrote them
+FROM_GRAFT="tuteur 0.3.0 no longer reads graft's names: move with tuteur 0.2.x first (https://github.com/danielnaab/tuteur/blob/v0.2.1/docs/guides/move-from-graft.md), then follow v0.3.0's Upgrading steps in tuteur's CHANGELOG.md"
 
 # tuteur try's marker, at the repo's top: a file marked with intent to add, so that Nix reads the
 # working tree (a tracked file differs from HEAD)
 TRY=.tuteur-try
-# graft's (graft v2): check fails on it too, through 0.2.x
-# shellcheck disable=SC2034 # used by the scripts that source this file
-OLD_TRY=.graft-try
 # try_state (from the top): "on" while the index holds the marker and HEAD doesn't; "committed" when
 # HEAD holds it and the index still does (a staged removal is off); "left" when it is only an
 # untracked file (after a reset): Nix doesn't read the working tree for it; nothing when try is off
@@ -62,19 +59,14 @@ try_state() {
 }
 
 # provider_file PATH: the provider file of the pattern at PATH: PATH/pattern.nix, else PATH/tuteur.nix (0.2.0's name,
-# read through 0.x), else PATH/graft.nix (graft v2's name,
-# read through 0.2.x); fails when it has neither
+# read through 0.x); fails when it has neither (graft v2's graft.nix is read no more: tuteur check says so)
 provider_file() {
-  if [ -f "$1/pattern.nix" ]; then echo "$1/pattern.nix"; elif [ -f "$1/tuteur.nix" ]; then echo "$1/tuteur.nix"; elif [ -f "$1/graft.nix" ]; then echo "$1/graft.nix"; else return 1; fi
+  if [ -f "$1/pattern.nix" ]; then echo "$1/pattern.nix"; elif [ -f "$1/tuteur.nix" ]; then echo "$1/tuteur.nix"; else return 1; fi
 }
-
-# The copy-mode README graft v2.12 and earlier wrote: a table of copied patterns
-copy_mode_readme() { grep -qsF -e '| Scion | Commit |' -e '<!-- graft flake: ' "$1"; }
-COPY_MODE="is graft's copy-mode README (v2.12 or earlier): graft v2.13.0 pins scions with git submodules; follow the Upgrading steps of v2.13.0 in graft's CHANGELOG.md (https://github.com/danielnaab/graft/blob/v2/CHANGELOG.md)"
 
 # locate [REPO]: cd to the repo's top (REPO's, with -C, else the current directory's) and set:
 #   PATTERNS      the patterns folder, from the top: the one folder whose README.md carries tuteur's
-#               marker, or graft's (git grep, which never looks inside a submodule, so a provider's own patterns
+#               marker (git grep, which never looks inside a submodule, so a provider's own patterns
 #               README is never ours), or "" when there is none yet
 #   PATTERNS_NEW  where a first pattern goes when there is none: TUTEUR_DIR (mkFlake's dir, set by a
 #               repo's own app) beside the flake the app was run from, else `.patterns` at the top
@@ -85,7 +77,7 @@ COPY_MODE="is graft's copy-mode README (v2.12 or earlier): graft v2.13.0 pins sc
 #   FLAKE_NIX FLAKE_LOCK   its flake.nix and flake.lock, from the top
 #   TUTEUR_RUN   how a person runs its app from the top: `nix run .#tuteur`, `nix run 'path:DIR#tuteur'`
 #               (quoted for zsh)
-# Fails on a copy-mode patterns README (graft v2.12), and on two patterns folders.
+# Fails on a README.md that carries graft's marker (graft v2: FROM_GRAFT), and on two patterns folders.
 # shellcheck disable=SC2034 # set for the scripts that source this
 locate() {
   local out rc=0 d prefix n
@@ -94,14 +86,14 @@ locate() {
   prefix=$(git rev-parse --show-prefix)
   TOP=$(git rev-parse --show-toplevel)
   cd "$TOP" || exit 1
-  out=$(git grep -l -F -e "$MARKER" -e "$OLD_MARKER" -e '| Scion | Commit |' -- '*/README.md') || rc=$?
+  out=$(git grep -l -F -e "$MARKER" -e "$OLD_MARKER" -- '*/README.md') || rc=$?
   [ "$rc" -le 1 ] || die "can't search $(pwd) with git (exit $rc; see above)"
   PATTERNS=""
   n=0
   while IFS= read -r d; do
     [ -n "$d" ] || continue
-    ! copy_mode_readme "$d" || die "$d $COPY_MODE"
-    grep -qsF -e "$MARKER" -e "$OLD_MARKER" -- "$d" || continue
+    ! grep -qsF -- "$OLD_MARKER" "$d" || die "$d carries graft's marker (graft v2): $FROM_GRAFT"
+    grep -qsF -- "$MARKER" "$d" || continue
     n=$((n + 1))
     if [ -n "$PATTERNS" ]; then die "two patterns folders: $PATTERNS, ${d%/README.md}; tuteur supports one per repository"; fi
     PATTERNS=${d%/README.md}
@@ -395,7 +387,7 @@ report() {
   own=$(own_input "$FLAKE_LOCK")
   if [ -n "$own" ] && ! patterns_registered .gitmodules | cut -f1 | grep -qxF "$own"; then
     n=$(lock_node "$FLAKE_LOCK" "$own")
-    ref=$(jq -r '.original.ref // empty' <<<"$n"); url=$(remote "$n")
+    ref=$(pin_ref "$n"); url=$(remote "$n")
     if [ -z "$url" ] || ! is_semver "$ref"; then
       ref="untagged:${ref:-$(jq -r '.locked.rev[0:12] // .original.type // "-"' <<<"$n")}"
     fi
@@ -403,7 +395,7 @@ report() {
   fi
   n=$(lock_node "$FLAKE_LOCK" pot)
   if [ -n "$n" ] && ! patterns_registered .gitmodules | cut -f1 | grep -qxF pot; then
-    ref=$(jq -r '.original.ref // empty' <<<"$n"); url=$(remote "$n")
+    ref=$(pin_ref "$n"); url=$(remote "$n")
     if [ -n "$url" ] && is_semver "$ref"; then row pot - "$url" "$ref"; fi
   fi
   while IFS=$'\t' read -r name path url; do
@@ -442,7 +434,7 @@ pin_hash_problems() {
   while IFS= read -r name; do
     n=$(lock_node "$FLAKE_LOCK" "$name")
     [ -n "$n" ] || continue
-    IFS=$'\x1f' read -r type ref rev nar ei sub < <(jq -r '[.locked.type // "", .original.ref // .locked.ref // "",
+    IFS=$'\x1f' read -r type ref rev nar ei sub < <(jq -r '[.locked.type // "", (.original.ref // .locked.ref // "" | sub("^refs/tags/"; "")),
       .locked.rev // "", .locked.narHash // "", (if (.locked.exportIgnore // .original.exportIgnore // false) then "1" else "" end),
       (if (.locked.submodules // .original.submodules // false) then "1" else "" end)] | join("\u001f")' <<<"$n")
     case $type in github) ei=1 ;; git) ;; *) continue ;; esac
@@ -462,6 +454,10 @@ pin_hash_problems() {
     echo "$FLAKE_LOCK pins $name at $ref (${rev:0:7}) with narHash $nar, but its tag's git archive hashes to $want: Nix's fetch cache probably gave the lock a tree that another fetch of that commit left there (a git+file: or . fetch keeps the files a provider export-ignores), and a machine without that cache, such as CI, fails with NAR hash mismatch: re-lock $name through an empty fetch cache: XDG_CACHE_HOME=\$(mktemp -d) $upd $name"
   done < <(jq -r '.nodes.root.inputs // {} | keys[]' "$FLAKE_LOCK")
 }
+
+# pin_ref NODE: the ref a lock node's flake.nix url names (original.ref), a tag without its refs/tags/ (a git input
+# spells a tag git+https://…?ref=refs/tags/vX, since Nix reads a bare ref as a branch: it is the tag vX), or nothing
+pin_ref() { jq -r '.original.ref // empty | sub("^refs/tags/"; "")' <<<"$1"; }
 
 # One root input's node in the flake.lock at $1, as JSON, or nothing.
 lock_node() { [ -f "$1" ] || return 0; jq -c --arg n "$2" '.nodes.root.inputs[$n] as $k | if ($k|type)=="string" then .nodes[$k] else empty end' "$1"; }
@@ -533,8 +529,8 @@ upstream_input() {
 # lock_ref NODE: the ref a lock node pins: flake.nix's (original.ref), or under
 # `nix flake lock --override-input` the override's (locked.ref, when it differs: a provider's branch,
 # say). Nothing for an input flake.nix names without a ref, whose locked.ref is only Nix's default
-# branch (refs/heads/main).
-lock_ref() { jq -r '.original.ref as $o | if $o and .locked.ref and .locked.ref != $o then .locked.ref else $o // empty end' <<<"$1"; }
+# branch (refs/heads/main). A tag is named without its refs/tags/ (pin_ref).
+lock_ref() { jq -r '.original.ref as $o | if $o and .locked.ref and .locked.ref != $o then .locked.ref else $o // empty end | sub("^refs/tags/"; "")' <<<"$1"; }
 
 # upstream_range NAME NODE FROM_REV TO_REV FROM_REF TO_REF [STATUS]: what changed upstream for an
 # input (NODE, its flake.lock node, says where it comes from) between two commits, as one JSON

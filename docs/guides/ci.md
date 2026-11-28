@@ -9,7 +9,7 @@ merge it or fix it.
 ## Before you begin
 
 - tuteur's two workflows are in `.forgejo/workflows/`: `tuteur-check.yaml` and `tuteur-upgrade.yaml`.
-  `nix flake init -t github:danielnaab/tuteur/v0.2.1` writes them. If you did not use it, copy tuteur's
+  `nix flake init -t github:danielnaab/tuteur/v0.3.0` writes them. If you did not use it, copy tuteur's
   [template/.forgejo/workflows/](../../template/.forgejo/workflows/) there, and commit them. tuteur keeps
   them current ([Files](../reference/files.md#tuteurs-workflows)).
 - A Forgejo Actions runner has the label `nixos-latest`, mapped to `docker://nixos/nix`. Each job must get a
@@ -18,7 +18,7 @@ merge it or fix it.
   that Forgejo gives each job (`github.token`). If the branch's name is not `main`, change
   `branches: [main]` under `push:` in `tuteur-check.yaml`; tuteur keeps your line
   ([Files](../reference/files.md#the-branches-line)). The commands below say `main`: use your branch's name.
-- For a private repository, add the Actions secret `TUTEUR_PR_TOKEN` (graft's `GRAFT_PR_TOKEN` still works through 0.2.x): a token with the `write:repository`
+- For a private repository, add the Actions secret `TUTEUR_PR_TOKEN` (graft's `GRAFT_PR_TOKEN` still works): a token with the `write:repository`
   scope, of a user who can write to the repository. A bot account is the best owner, because it becomes the
   pull request's author. A user-level secret covers all that user's repositories.
 - To make your own checks a required status, see
@@ -53,7 +53,7 @@ merge it or fix it.
    If your checks fail on the upgrade, the **upgrade** job fails, but it still pushes the branch, and the
    **pr** job still opens the pull request.
 
-2. Open the pull request from the branch `tuteur/upgrade`. Read its title:
+2. Open the pull request from the branch `patterns/upgrade`. Read its title:
 
    - `tuteur: upgrade`: the repository's whole `nix flake check` passed on the branch. Go to step 3.
    - `[checks failing] tuteur: upgrade`: it failed. The description starts with a warning, and has a section
@@ -61,7 +61,7 @@ merge it or fix it.
      [If something goes wrong](#if-something-goes-wrong). The warning:
 
      ```
-     nix flake check fails on this branch. The upgrade is pushed so the breakage can be read. Fix your own files on a branch made from this one: the next run force-pushes tuteur/upgrade. If the provider broke something, tell its maintainers.
+     nix flake check fails on this branch. The upgrade is pushed so the breakage can be read. Fix your own files on a branch made from this one: the next run force-pushes patterns/upgrade. If the provider broke something, tell its maintainers.
      ```
 
    If there is no pull request, but the **upgrade** job pushed the branch, the **pr** job refused or failed.
@@ -125,7 +125,7 @@ merge it or fix it.
 
    ```
    git fetch origin
-   git diff --stat origin/main...origin/tuteur/upgrade
+   git diff --stat origin/main...origin/patterns/upgrade
    ```
 
    Expect one line per moved pattern, such as `.patterns/style-guide | 2 +-` (a gitlink), and, when tuteur's own pin
@@ -137,7 +137,7 @@ merge it or fix it.
    change:
 
    ```
-   git diff --submodule=log origin/main...origin/tuteur/upgrade -- .patterns/
+   git diff --submodule=log origin/main...origin/patterns/upgrade -- .patterns/
    git -C .patterns/style-guide fetch --tags -q && git -C .patterns/style-guide diff --stat v1.0.0 v1.1.0
    ```
 
@@ -179,11 +179,11 @@ it. A status `unknown` means that tuteur cannot read the provider's repository.
   error: builder for '/nix/store/…-style-quote.drv' failed with exit code 1;
   ```
 
-  Do not fix it on `tuteur/upgrade`: the next run force-pushes that branch. Make a branch from it:
+  Do not fix it on `patterns/upgrade`: the next run force-pushes that branch. Make a branch from it:
 
   ```
   git fetch origin
-  git switch --no-track -c fix-upgrade origin/tuteur/upgrade
+  git switch --no-track -c fix-upgrade origin/patterns/upgrade
   ```
 
   If tuteur's own pin moved, read the diff (step 7) before you run anything: `nix flake check` on this
@@ -222,13 +222,13 @@ it. A status `unknown` means that tuteur cannot read the provider's repository.
 - **The pr job refuses.** It opens no pull request for a branch that changes files that `tuteur upgrade` never
   writes:
 
-  - `tuteur/upgrade changes files tuteur upgrade never writes: docs/plan.md. Not opening a PR; …`: the branch
+  - `patterns/upgrade changes files tuteur upgrade never writes: docs/plan.md. Not opening a PR; …`: the branch
     differs from the default branch in other files. Usually the default branch changed after the
     **upgrade** job made the branch. Run the workflow again. If that does not help, someone pushed to
-    `tuteur/upgrade`: read the diff at the link in the message.
+    `patterns/upgrade`: read the diff at the link in the message.
   - `this upgrade changes CI workflows: .forgejo/workflows/tuteur-check.yaml. A PR would run them with the repo's secrets before anyone reads them, so none is opened: …`:
     tuteur moved its own pin, and the new version's workflows differ. Read the diff at the link in the
-    message ([CI security](../ci-security.md)). If it is safe, open the pull request from `tuteur/upgrade`
+    message ([CI security](../ci-security.md)). If it is safe, open the pull request from `patterns/upgrade`
     yourself. For its description, run `nix run .#tuteur changelog` on the default branch.
   - A `.gitmodules` change (a provider's URL) is refused the same way: a provider swap needs a person. Make
     it by hand ([Ship and take a breaking change](incompatible-change.md#if-something-goes-wrong)).
@@ -245,8 +245,10 @@ it. A status `unknown` means that tuteur cannot read the provider's repository.
 ## How it works
 
 - **Two jobs.** The **upgrade** job runs `nix run .#tuteur ci upgrade`: `tuteur upgrade`, a commit, then the
-  whole `nix flake check` on the committed tree. It force-pushes `tuteur/upgrade` even when a check fails, and
-  then fails. It moves gitlinks without cloning the patterns. It holds only the job token. The **pr** job runs `nix run .#tuteur ci pr` from the default
+  whole `nix flake check` on the committed tree. It force-pushes `patterns/upgrade` even when a check fails, and
+  then fails. Before tuteur 0.3.0 the branch was `tuteur/upgrade`: the job deletes it on origin when its newest
+  commit is the job's own, which closes its pull request, and warns when someone else's commit is on it. It moves
+  gitlinks without cloning the patterns. It holds only the job token. The **pr** job runs `nix run .#tuteur ci pr` from the default
   branch, with `TUTEUR_PR_TOKEN`. It opens the pull request, or rewrites the title and description of the
   open one. Why: [CI security](../ci-security.md).
 - **tuteur-check** runs `nix run .#tuteur ci check` for pull requests and pushes to the default branch that
@@ -261,20 +263,20 @@ it. A status `unknown` means that tuteur cannot read the provider's repository.
   force-pushes it to `origin`. It refuses a working tree with changes of its own, and any other branch:
 
   ```
-  git switch -c tuteur/upgrade
-  BRANCH=tuteur/upgrade nix run .#tuteur ci upgrade
+  git switch -c patterns/upgrade
+  BRANCH=patterns/upgrade nix run .#tuteur ci upgrade
   git switch main
   ```
 
   On `main`, it prints
-  `tuteur: ci upgrade commits on the branch checked out, main, and pushes it to tuteur/upgrade: switch to a new branch tuteur/upgrade first (git switch -c tuteur/upgrade)`.
+  `tuteur: ci upgrade commits on the branch checked out, main, and pushes it to patterns/upgrade: switch to a new branch patterns/upgrade first (git switch -c patterns/upgrade)`.
   With a changed or untracked file, it lists them, then prints
   `tuteur: ci upgrade commits every change in the working tree, and this one has the changes of its own above: commit, stash or remove them first`. A `flake.lock` that Nix re-locked is the one change it takes: the upgrade commit includes it.
 
   `ci pr` uses Forgejo's API, and needs `API`, `WEB`, `BASE`, `BRANCH` and `PR_TOKEN`. On GitHub, open the
   pull request yourself, from a job checked out at the default branch, with `contents: write` and
   `pull-requests: write` permissions, and the repository setting that allows GitHub Actions to create pull
-  requests. For example: `gh pr create --head tuteur/upgrade --title "tuteur: upgrade" || gh pr edit tuteur/upgrade --title "tuteur: upgrade"`.
+  requests. For example: `gh pr create --head patterns/upgrade --title "tuteur: upgrade" || gh pr edit patterns/upgrade --title "tuteur: upgrade"`.
   A pull request opened with `GITHUB_TOKEN` starts no workflows. Without `ci pr`, nothing refuses a branch
   that changes other files: check its file list (step 6) yourself. tuteur does not manage files in
   `.github/workflows/`.
@@ -282,7 +284,7 @@ it. A status `unknown` means that tuteur cannot read the provider's repository.
   each checkout:
 
   ```
-  for r in ~/src/team-kb ~/src/handbook; do echo "$r"; nix run github:danielnaab/tuteur/v0.2.1 -- outdated -C "$r"; done
+  for r in ~/src/team-kb ~/src/handbook; do echo "$r"; nix run github:danielnaab/tuteur/v0.3.0 -- outdated -C "$r"; done
   ```
 
 ## Report who signed each commit

@@ -14,9 +14,11 @@
 #            failing check doesn't stop the push: the commit message is amended with the failing
 #            checks and the tail of each log, so the PR shows the breakage, and the step then
 #            fails. Refuses a working tree with changes of its own (but a re-locked flake.lock),
-#            and a branch other than $BRANCH checked out (a detached HEAD is fine). The check runs
-#            the code of the versions just moved to before anyone reviewed them, so this step
-#            must hold no secret beyond the job's own token (and a read-only key for private patterns).
+#            and a branch other than $BRANCH checked out (a detached HEAD is fine). Then it deletes
+#            tuteur/upgrade, the branch tuteur 0.2.x's workflow pushed, if this job wrote it, which closes
+#            its PR (stale_branch). The check runs the code of the versions just moved to before anyone
+#            reviewed them, so this step must hold no secret beyond the job's own token (and a read-only
+#            key for private patterns).
 #   signers  report-only (R0.5): who signed what a push brought, against the repo's
 #            .forgejo/allowed_signers (see signers() below). Always exits 0; findings are ::warning::
 #            lines and a summary. Reads only git objects and the signers file as data; runs nothing
@@ -60,7 +62,7 @@ check() {
 
 upgrade() {
   local changes checks=passed cur dirty
-  [ -n "${BRANCH:-}" ] || die "BRANCH is not set: name the branch to push the upgrade to (tuteur's workflow sets BRANCH=tuteur/upgrade)"
+  [ -n "${BRANCH:-}" ] || die "BRANCH is not set: name the branch to push the upgrade to (tuteur's workflow sets BRANCH=patterns/upgrade)"
   # It commits on the branch checked out and stages everything: never the default branch, and
   # nothing of anyone's but tuteur's (untracked files would be pushed with it)
   cur=$(git symbolic-ref -q --short HEAD) || cur=""
@@ -81,7 +83,7 @@ upgrade() {
   # a breaking version alone moves nothing and opens no PR: say so where the run's summary shows it
   grep -E '^tuteur: .* is a breaking version' "$log" | sed 's/^tuteur: /::warning::/' || true
   git add -A
-  if git diff --cached --quiet; then output changed=false; return 0; fi
+  if git diff --cached --quiet; then stale_branch; output changed=false; return 0; fi
   changes=$(grep -E '^tuteur: (.* -> |refreshed |renamed |wrote |.* is a breaking version)' "$log" || true)
   # committed first: a git flake reads the patterns at the gitlinks HEAD records only while the tree
   # is clean (a staged gitlink alone is still the old version to Nix)
@@ -93,10 +95,31 @@ upgrade() {
       commit -q --amend -m "tuteur: upgrade" -m "$changes"$'\n\n'"$(<"$report")"
   fi
   git push -q --force origin "HEAD:refs/heads/$BRANCH"
+  stale_branch
   output changed=true
   if [ "$checks" = failed ]; then
     echo "::error::$(head -1 "$report"). $BRANCH is pushed, and its PR will say so."
     exit 1
+  fi
+}
+
+# stale_branch: remove tuteur/upgrade from origin, the branch tuteur's workflow pushed before 0.3.0 (BRANCH is now
+# patterns/upgrade), so its open PR doesn't linger: Forgejo closes a PR whose head branch is deleted. Only a branch
+# this job wrote: its tip is a commit of tuteur-upgrade's, "tuteur: upgrade", and the push leases that commit; one
+# with anyone else's commit on it is left, with a warning. Never fails the job.
+stale_branch() {
+  local old=tuteur/upgrade tip
+  [ "$BRANCH" != "$old" ] || return 0
+  git fetch -q --no-tags origin "refs/heads/$old" 2>/dev/null || return 0
+  tip=$(git rev-parse -q --verify 'FETCH_HEAD^{commit}') || return 0
+  if [ "$(git log -1 --format='%ce%x1f%s' "$tip")" != "tuteur-upgrade@noreply.invalid"$'\x1f'"tuteur: upgrade" ]; then
+    echo "::warning::$old, the branch tuteur's upgrade job pushed before 0.3.0, has a commit that isn't the job's (${tip:0:12}): left as it is; delete it (and close its PR) yourself once it is merged or not wanted"
+    return 0
+  fi
+  if git push -q --force-with-lease="refs/heads/$old:$tip" origin --delete "refs/heads/$old" 2>"$TUTEUR_TMP/stale.err"; then
+    echo "tuteur: deleted $old, the upgrade branch before tuteur 0.3.0 (its PR closes with it); upgrades are pushed to $BRANCH"
+  else
+    echo "::warning::couldn't delete $old, the upgrade branch before tuteur 0.3.0: $(tail -1 "$TUTEUR_TMP/stale.err"); delete it (and close its PR) yourself"
   fi
 }
 
@@ -191,7 +214,6 @@ pr() {
   while IFS= read -r line; do
     case $line in
       "tuteur: "*" is a breaking version"*) held+="- ${line#tuteur: }"$'\n' ;;
-      "graft: "*" is a new major version"*) held+="- ${line#graft: }"$'\n' ;;   # a branch graft v2's ci upgrade wrote
       "tuteur: "*) moved+="- ${line#tuteur: }"$'\n' ;;
       "nix flake check failed:"*) break ;;
     esac
@@ -274,10 +296,9 @@ pr() {
 #   - a change to a protected path ($TUTEUR_SIGNERS_PERSON: shell patterns, where * also matches /) is signed by
 #     a @person key.
 # A tag: report the peeled target, verified SSH principal (any class) and PUSH_ACTOR from the forge separately.
-# (graft's names, GRAFT_SIGNERS_*, are read when the new ones are not set: through 0.2.x)
-TUTEUR_SIGNERS_FILE=${TUTEUR_SIGNERS_FILE:-${GRAFT_SIGNERS_FILE:-.forgejo/allowed_signers}}
-TUTEUR_SIGNERS_PERSON=${TUTEUR_SIGNERS_PERSON:-${GRAFT_SIGNERS_PERSON:-"grants.json */grants.json .forgejo/allowed_signers AGENTS.md */AGENTS.md CLAUDE.md */CLAUDE.md .claude/* */.claude/* .pi/* */.pi/*"}}
-TUTEUR_SIGNERS_MAX=${TUTEUR_SIGNERS_MAX:-${GRAFT_SIGNERS_MAX:-100}}
+TUTEUR_SIGNERS_FILE=${TUTEUR_SIGNERS_FILE:-.forgejo/allowed_signers}
+TUTEUR_SIGNERS_PERSON=${TUTEUR_SIGNERS_PERSON:-"grants.json */grants.json .forgejo/allowed_signers AGENTS.md */AGENTS.md CLAUDE.md */CLAUDE.md .claude/* */.claude/* .pi/* */.pi/*"}
+TUTEUR_SIGNERS_MAX=${TUTEUR_SIGNERS_MAX:-100}
 
 signers_class() {   # PRINCIPAL -> person | routine | agent | other | none
   case $1 in

@@ -16,7 +16,7 @@
 # All three read the repo as data. A pattern's pin is its gitlink (the commit the index records) and
 # its upstream the URL in .gitmodules; its version is the highest semver tag upstream at that commit
 # (none: `untagged`). tuteur's own pin is the flake input named `tuteur` in flake.lock, else the one
-# named `graft` (graft v2's name, read through 0.x).
+# named `graft` (graft v2's name, read through 0.x). A git input's ref=refs/tags/vX is the tag vX.
 #
 # Moving a pattern: refused when its checkout has uncommitted edits or sits at another commit than
 # the gitlink. An initialised pattern fetches the tag and checks it out, and the gitlink is staged
@@ -71,11 +71,12 @@ cmd_outdated() {
 
 # Swap NAME's ref from OLD to NEW in the flake.nix text on stdin, finding NAME's url by its whole
 # spelling from flake.lock (lib/retarget.jq), so two inputs pinned to one tag never collide. Prints
-# the new text, or fails saying why.
+# the new text, or fails saying why. A ref flake.nix spells refs/tags/OLD (a git input's tag) stays so spelled.
 retarget_text() {
   local name=$1 old=$2 new=$3 n type prefix
   n=$(node "$name")
   type=$(jq -r .original.type <<<"$n")
+  if [ "$(jq -r '.original.ref // ""' <<<"$n")" = "refs/tags/$old" ]; then old=refs/tags/$old new=refs/tags/$new; fi
   case $type in
     github) prefix=$(jq -r '"github:\(.original.owner)/\(.original.repo)"' <<<"$n") ;;
     git)    prefix=$(jq -r '"git+\(.original.url)"' <<<"$n") ;;
@@ -96,8 +97,9 @@ retarget() {
 tuteur_src() {
   local n ref tag=$1 path
   n=$(node "$OWN")
+  # a git input's ref as flake.nix spells it: refs/tags/TAG, or TAG
   ref=$(jq -r --arg t "$tag" 'if .original.type=="github" then "github:\(.original.owner)/\(.original.repo)/\($t)"
-                              elif .original.type=="git" then "git+\(.original.url)?ref=\($t)"
+                              elif .original.type=="git" then "git+\(.original.url)?ref=\(if (.original.ref // "") | startswith("refs/tags/") then "refs/tags/" else "" end)\($t)"
                               else empty end' <<<"$n")
   [ -n "$ref" ] || die "can't fetch this repo's tuteur input ($(jq -r .locked.type <<<"$n"))"
   # through an empty fetch cache, as flake_update re-locks it: the tag's own tree
@@ -159,7 +161,7 @@ cmd_upgrade() {
       [ "$status" = outdated ] || continue
       # tuteur's workflows before 2.3 run tuteur upgrade and open the PR in one job: moving tuteur
       # there would run the new version's code beside the PR token. tuteur ci sets TUTEUR_CI.
-      if [ "$dir" = - ] && [ "$name" = "$OWN" ] && [ -n "${CI:-}" ] && [ -z "${TUTEUR_CI:-}${GRAFT_CI:-}" ]; then
+      if [ "$dir" = - ] && [ "$name" = "$OWN" ] && [ -n "${CI:-}" ] && [ -z "${TUTEUR_CI:-}" ]; then
         echo "tuteur: not moving tuteur itself from a CI job that isn't tuteur ci (copy tuteur's template/.forgejo/workflows/ workflows)" >&2
         continue
       fi

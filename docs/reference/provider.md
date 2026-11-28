@@ -9,8 +9,8 @@ owns, are listed in [pot's contracts](https://github.com/danielnaab/pot/blob/v0.
 
 | | |
 |---|---|
-| Version | 3. provider/2 is graft's `graft.nix`, which tuteur 0.2.x still reads (below). A breaking change to this contract is provider/4, in a breaking version of tuteur. |
-| Producer | a provider's `pattern.nix`, at the top of its repository (else its `tuteur.nix`, through 0.x; else its `graft.nix`, through 0.2.x) |
+| Version | 3. provider/2 is graft's `graft.nix`, which tuteur read through 0.2.x (below). A breaking change to this contract is provider/4, in a breaking version of tuteur. |
+| Producer | a provider's `pattern.nix`, at the top of its repository (else its `tuteur.nix`, through 0.x) |
 | Reader | tuteur's mkFlake, in each consumer, once per system |
 | Owner | tuteur |
 
@@ -35,7 +35,6 @@ owns, are listed in [pot's contracts](https://github.com/danielnaab/pot/blob/v0.
 | `pkgs`, `lib`, `system` | nixpkgs, its lib, a system string | the consumer's `inputs.nixpkgs` if it has one, else tuteur's |
 | `pattern` | a store path | this pattern alone, without its `.git` file |
 | `patterns` | attrs | every pattern of the consumer: its store path as `outPath`, merged with its `pattern.nix` result |
-| `scion`, `scions` | | provider/2's names for `pattern` and `patterns`, passed beside them through 0.2.x. A function that names only `scion` or `scions` gets only those two; one that names only `pattern` or `patterns`, only the new two; any other gets all four. |
 | `consumer` | a store path | the consumer flake's source |
 | `kitArgs` | attrs | the consumer's `perSystem.kitArgs.<pattern>`, or `{ }`. Passed only when the function names it. |
 
@@ -49,8 +48,8 @@ owns, are listed in [pot's contracts](https://github.com/danielnaab/pot/blob/v0.
 | `kit` | a [kit](https://github.com/danielnaab/pot/blob/v0.1.0/contracts/kit-1.md), or `null` | when the consumer has `inputs.pot`: the pattern's kit in `packages.<system>.pot-kits`, which mkFlake has pot's [kitsFor](https://github.com/danielnaab/pot/blob/v0.1.0/contracts/pot-lib-1.md) write, with the file `<dir>/<pattern>/pattern.nix`. Without `inputs.pot`: nothing, and one warning |
 | anything else | any | visible to other providers as `patterns.<name>.<attr>`; not a flake output |
 
-Reserved names, an evaluation error when a provider or `perSystem` gives them: `apps.tuteur`, `apps.graft`, `packages.tools`,
-and in both `apps` and `packages`: `sandbox`, `pot`, `pot-kits` and `graft-kits`. The full merge and collision
+Reserved names, an evaluation error when a provider or `perSystem` gives them: `apps.tuteur`, `packages.tools`,
+and in both `apps` and `packages`: `sandbox`, `pot` and `pot-kits`. The full merge and collision
 rules are in [Files](files.md#patternnix).
 
 tuteur reads no field of `kit`. Its schema, its checks and their messages are pot's: an unknown field fails the
@@ -59,16 +58,16 @@ consumer's `pot-kits` build with `pot: <dir>/<pattern>/pattern.nix: <field> is n
 ## Compatibility
 
 - **Arguments are added, never removed within a version.** A provider takes `...`, so a later tuteur can pass
-  more. provider/3 renamed provider/2's `scion` and `scions`; 0.2.x passes both, and 0.3.0 drops the old two.
+  more. provider/3 renamed provider/2's `scion` and `scions`; 0.2.x passed both, and 0.3.0 passes neither: a
+  function that names one fails, ``tuteur: <file> names scion and scions, graft's arguments (provider/2), which
+  tuteur 0.3.0 no longer gives: name them pattern and patterns (provider/3)``.
 - **`tuteur.nix`** is this contract's file under its name before 0.2.1. tuteur reads it when the provider has no
   `pattern.nix`, through 0.x. A consumer on tuteur 0.2.0 reads only `tuteur.nix`, so a provider that drops it
   needs its consumers on 0.2.1 or later: a breaking release of the provider, or ship both files meanwhile.
-- **`graft.nix`** (provider/2's file) is read when the provider has neither, through 0.2.x; `tuteur check`
-  names it. A provider can ship both files meanwhile: tuteur reads `pattern.nix`, graft reads `graft.nix`. pot
-  protects all three names in a run.
+- **`graft.nix`** (provider/2's file) was read through 0.2.x, and is not since 0.3.0: `tuteur check` fails on a
+  pattern that has only it. pot protects `pattern.nix` and `tuteur.nix` in a run.
 - **Every attribute is optional.** A missing one is empty.
-- **`sandbox`,** graft v2.14.0's attribute, is an error that names its replacement:
-  ``tuteur: <file> gives `sandbox`: graft v2.15.0 replaced it with `kit` (pot; see graft's CHANGELOG)``.
+- **`sandbox`,** graft v2.14.0's attribute, is not read since 0.3.0 (through 0.2.x, an error naming `kit`).
 - **A kit's format is not this contract's.** It moves with [kit/1](https://github.com/danielnaab/pot/blob/v0.1.0/contracts/kit-1.md): a provider that
   writes a newer kit needs its consumers' roots on a pot that reads it, not a newer tuteur.
 

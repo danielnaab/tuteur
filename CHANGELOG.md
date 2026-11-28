@@ -1,5 +1,69 @@
 # Changelog
 
+## v0.3.0 - 2026-11-27
+
+A breaking version: graft's names are dropped, and the weekly upgrade branch is `patterns/upgrade`. The weekly
+upgrade holds it for a person. A consumer still on graft's names moves with tuteur 0.2.x first
+([Move from graft v2](docs/guides/move-from-graft.md)), then follows the steps below.
+
+- **graft's names are no longer read.** tuteur 0.2.x read them, and its `check` printed a line for each one in use
+  (`… is graft's name; 0.3.0 drops it: …`); those lines are gone. Dropped:
+  - the app `graft` (`nix run .#graft`);
+  - `scions/` and `.scions/` as the default folder: with no `dir`, mkFlake reads `.patterns` only, and a folder of
+    another name holding tuteur's README is the error `tuteur's README is in scions/ but mkFlake's dir is
+    ".patterns": set dir = "scions"; …` (in `check` and in mkFlake);
+  - graft's marker README (`<!-- managed by graft: … -->`): every command, and mkFlake, refuse it, naming tuteur
+    0.2.x's guide and these steps;
+  - a provider's `graft.nix`: not read; `check` fails on a filled pattern that has only it;
+  - provider/2's arguments `scion` and `scions`: not passed; a provider (or `perSystem`) whose function names one
+    fails, naming `pattern` and `patterns` ([provider/3](docs/reference/provider.md));
+  - graft's marked `graft-*.yaml` workflows: `sync` no longer renames them, and `check` fails on one (it runs
+    `nix run .#graft`); the `# graft ssh:` line, now a hand edit of the workflow;
+  - `add --scions` (an unknown option), `.graft-try`, `# graft: no self.submodules`, `GRAFT_SIGNERS_*` and
+    `GRAFT_CI`;
+  - graft's leftovers: the copy-mode README's refusal (graft v2.12), `lib/assemble.sh` (a stub for graft v2.12's
+    upgrade), the `sandbox` attribute's error (graft v2.14.0), the reserved names `apps.graft` and `graft-kits`,
+    and the `copy-mode` fixture.
+- **Still read:** the flake input name `graft` (tuteur's own pin is the input `tuteur`, else `graft`, through
+  0.x); a provider's `tuteur.nix`, after `pattern.nix` (through 0.x); the secrets `GRAFT_PR_TOKEN` and
+  `GRAFT_SSH_KEY`, after `TUTEUR_PR_TOKEN` and `TUTEUR_SSH_KEY`, since only their owner can rename them. The
+  workflow files keep their names (`tuteur-check.yaml`, `tuteur-signers.yaml`, `tuteur-upgrade.yaml`) and their job
+  and check names, which branch rules may require. status/1 keeps its field names (`scions_dir`, `graft`,
+  `scions`), and pot-lib/1 its `scions`: a contract's fields are its interface.
+- **The weekly upgrade branch is `patterns/upgrade`** (was `tuteur/upgrade`): the workflow's `BRANCH`, `ci
+  upgrade`'s messages, `migrate`'s brief and the docs. Each run of `ci upgrade` deletes `tuteur/upgrade` on
+  origin if its newest commit is the job's own (`tuteur: upgrade`, by `tuteur-upgrade@noreply.invalid`), with a
+  lease on that commit; Forgejo closes the branch's open pull request with it. A `tuteur/upgrade` with anyone
+  else's commit on it is left, with a warning ([ci](docs/reference/commands.md#ci)).
+- **`outdated` reads a git pin at `ref=refs/tags/vX` as the tag `vX`.** A `git+https://…?ref=refs/tags/vX` input
+  (Nix reads a bare `ref` as a branch, so a remote git input names a tag so) was `untagged`; `status`, `check`'s
+  narHash comparison, `changelog`, `migrate` and `ci pr` read it as the tag too, and `upgrade` moves it, keeping
+  the spelling (`ref=refs/tags/vY`) ([outdated](docs/reference/commands.md#outdated)).
+- **Tests:** `aliases` is `graftnames` (each dropped name rejected or ignored, `tuteur.nix` and the input name
+  `graft` still read); `fromgraft` moves a graft v2.22.0 consumer to tuteur v0.2.1 (this repository's tag) by the
+  guide, then to this version by the steps below; `ci` covers the stale branch; `tuteur` the `refs/tags/` pin.
+- The guides, references, template and fixtures pin tuteur v0.3.0; Move from graft v2 pins v0.2.1, which reads
+  graft's names.
+
+### Upgrading
+
+1. On tuteur 0.2.x, run `nix run .#tuteur check` and do what each `… is graft's name; 0.3.0 drops it: …` line
+   says, but the folder's (step 3): take a release of each provider that ships `pattern.nix` (`nix run .#tuteur
+   upgrade NAME`), rename `scion` and `scions` in your `perSystem` to `pattern` and `patterns`, and run
+   `nix run .#tuteur` where a script or recipe of yours runs `nix run .#graft`. A consumer still on graft v2
+   follows [Move from graft v2](docs/guides/move-from-graft.md) first.
+2. Take this version by name: `nix run .#tuteur upgrade tuteur@v0.3.0` (`graft@v0.3.0` when your input keeps
+   graft's name). It writes this version's workflows, whose weekly branch is `patterns/upgrade`.
+3. If your patterns are in `scions/` or `.scions/` and `mkFlake` has no `dir`, either:
+   - move them: `git mv scions .patterns` (git moves each submodule and its path in `.gitmodules`), change what
+     names the old folder (a `justfile`'s `import? "scions/kits.just"`, links in `AGENTS.md`), then
+     `nix run .#tuteur sync`; or
+   - keep them: add `dir = "scions";` to `mkFlake { … }` in `flake.nix`.
+4. Check: `nix run .#tuteur check` and `nix flake check`. Under pot, expect one `pot grant` for the repo kit,
+   because `flake.lock` changed. Commit, and merge.
+5. Nothing to do for `tuteur/upgrade`: the next weekly run deletes it, which closes its pull request. If it warns that the branch has someone else's commit, delete the branch yourself once that
+   work is merged or not wanted. Change any branch rule or script that names `tuteur/upgrade`.
+
 ## v0.2.1 - 2026-11-27
 
 A patch: the weekly upgrade takes it by itself.

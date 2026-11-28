@@ -4,17 +4,21 @@ status: working
 # Move from graft v2
 
 graft is now two repositories: tuteur, which pins patterns, and [pot](https://github.com/danielnaab/pot), which
-runs agents and commands in a sandbox. Move a consumer of graft v2 to tuteur 0.1.0 with one pull request. The
-input keeps its name, `graft`, so nothing else in your flake changes.
+runs agents and commands in a sandbox. Move a consumer of graft v2 to tuteur 0.2.1 with one pull request. The
+input keeps its name, `graft`, so nothing else in your flake changes. Then take tuteur 0.3.0 by its own Upgrading
+steps ([below](#then-tuteur-030)): 0.3.0 no longer reads graft's names, so a graft consumer always moves through
+0.2.x first.
 
 ## Before you begin
 
 - The repository is at graft v2.22.0 (`nix run .#graft outdated` lists `graft` at `v2.22.0`), and
   `nix run .#graft check` passes. Take v2.22.0 first if you are behind: it is an ordinary v2 release.
-- tuteur 0.2.x still reads graft's names: the input name `graft`, the app `graft`, `scions/` or `.scions/` as the
+- tuteur 0.2.x reads graft's names: the input name `graft`, the app `graft`, `scions/` or `.scions/` as the
   folder, graft's marker README, a provider's `graft.nix`, its arguments `scion` and `scions`, and `.graft-try`.
-  `tuteur check` prints one line for each one in use, and never fails on it. tuteur 0.3.0 drops them, except the
-  input name `graft`, which every 0.x reads.
+  Its `tuteur check` prints one line for each one in use, and never fails on it. tuteur 0.3.0 dropped them, except
+  the input name `graft` (read through 0.x) and the secrets `GRAFT_PR_TOKEN` and `GRAFT_SSH_KEY`. Run this guide
+  with tuteur 0.2.1, as its steps say, never 0.3.0: 0.3.0 refuses a README with graft's marker
+  (`… carries graft's marker (graft v2): tuteur 0.3.0 no longer reads graft's names: move with tuteur 0.2.x first …`).
 - This pull request does not move the folder. Keep `scions/` (or `.scions/`) for now: tuteur 0.3.0's Upgrading
   steps move it to `.patterns/`.
 - If any agent or kit command runs under pot here (the repository has kits, a `kits.just`, or agents run in it),
@@ -40,9 +44,9 @@ input keeps its name, `graft`, so nothing else in your flake changes.
    XDG_CACHE_HOME=$(mktemp -d) nix flake update graft
    ```
 
-   It locks `graft` at tuteur 0.1.0, and `pot` if you added it.
+   It locks `graft` at tuteur 0.2.1, and `pot` if you added it.
 
-2. Write tuteur's files, by the app's old name (tuteur 0.1.0, through the alias):
+2. Write tuteur's files, by the app's old name (tuteur 0.2.1, through the alias):
 
    ```
    nix run .#graft sync
@@ -82,7 +86,7 @@ input keeps its name, `graft`, so nothing else in your flake changes.
    - Edit any branch rule whose required status checks name `graft-check / …`: the workflow is now
      `tuteur-check`, and its job `patterns`.
    - Close the open `graft/upgrade` pull request, if there is one. Delete that branch after the merge: the weekly
-     job now pushes `tuteur/upgrade`.
+     job now pushes `tuteur/upgrade` (`patterns/upgrade` from 0.3.0, whose job deletes `tuteur/upgrade` itself).
 
 5. Commit everything, open the pull request, review it, and merge it.
 
@@ -94,7 +98,13 @@ nix run .#tuteur check
 ```
 
 `outdated` lists `graft` at `v0.2.1` (the input's name, tuteur's version). `check` passes. The next weekly
-`tuteur-upgrade` run takes tuteur's and pot's 0.1.x patches by itself, and holds 0.2.0 for a person.
+`tuteur-upgrade` run takes tuteur's and pot's patches by itself, and holds 0.3.0 for a person.
+
+## Then: tuteur 0.3.0
+
+Follow the Upgrading steps of [v0.3.0 in the CHANGELOG](../../CHANGELOG.md#v030---2026-11-27), in a second pull
+request. Before them, deal with each line that 0.2.1's `check` prints (`… is graft's name; 0.3.0 drops it: …`):
+each says what to do. The folder's line is the Upgrading steps' own.
 
 ## If something goes wrong
 
@@ -112,21 +122,27 @@ again (graft's repository stays, archived), and the workflows and README are gra
 
 tuteur 0.1.0 is graft's code with graft's names changed and pot taken out; its version line starts again at 0.1.0,
 in a new repository with no `v2.*` tags, so `outdated` compares it only with tuteur's own releases. The weekly job
-can't make this move: the URL changes, `v0.2.0` is not newer than `v2.22.0`, and `ci pr` never opens a pull
-request that changes `.forgejo/`. So each consumer moves by a person's pull request.
+can't make this move: the URL changes, `v0.2.1` is not newer than `v2.22.0`, and `ci pr` never opens a pull
+request that changes `.forgejo/`. So each consumer moves by a person's pull request. tuteur 0.1.x and 0.2.x read
+graft's names so that this pull request can stay small; 0.3.0 dropped them.
 
 ## Related
 
 - [Concepts: graft's words](../concepts.md#grafts-words)
 - [Decisions: two repositories](../decisions.md#two-repositories-tuteur-produces-kits-pot-runs-them)
-- [CHANGELOG, 0.1.0](../../CHANGELOG.md#v010---2026-11-21)
+- [CHANGELOG, 0.1.0](../../CHANGELOG.md#v010---2026-11-21), [0.3.0](../../CHANGELOG.md#v030---2026-11-27)
 
 ## Sources
 
-- [lib/mk-flake.nix](../../lib/mk-flake.nix): the folder fallback, `graft.nix`, the arguments, `inputs.pot`, the
-  app `graft`, and the lines `check` prints for them
-- [lib/workflows.sh](../../lib/workflows.sh): `sync` renames graft's marked workflows and reads `# graft ssh:`
-- [lib/patterns.sh](../../lib/patterns.sh): `check`'s lines for graft's names, `.graft-try`
-- [lib/common.sh](../../lib/common.sh): the input named `tuteur`, else `graft`; graft's marker
-- `tests/run.sh`, sections `aliases` and `fromgraft` (this page's steps, on a consumer of graft v2.22.0, then
-  rolled back)
+- tuteur v0.2.1's code, which this guide runs:
+  [lib/mk-flake.nix](https://github.com/danielnaab/tuteur/blob/v0.2.1/lib/mk-flake.nix) (the folder fallback,
+  `graft.nix`, the arguments, `inputs.pot`, the app `graft`, and the lines `check` prints for them),
+  [lib/workflows.sh](https://github.com/danielnaab/tuteur/blob/v0.2.1/lib/workflows.sh) (`sync` renames graft's
+  marked workflows and reads `# graft ssh:`),
+  [lib/patterns.sh](https://github.com/danielnaab/tuteur/blob/v0.2.1/lib/patterns.sh) (`check`'s lines for
+  graft's names, `.graft-try`)
+- [lib/common.sh](../../lib/common.sh): the input named `tuteur`, else `graft` (through 0.x); 0.3.0's refusal of
+  graft's marker
+- `tests/run.sh`, section `fromgraft` (this page's steps on a consumer of graft v2.22.0, with tuteur v0.2.1, then
+  rolled back and moved again; then v0.3.0's Upgrading steps), and `graftnames` (what 0.3.0 does with graft's
+  names)
